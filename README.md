@@ -122,6 +122,7 @@ docker-compose up --build
 ## Testing
 
 Run all tests with:
+
 ```sh
 poetry run pytest
 ```
@@ -133,5 +134,6 @@ poetry run pytest
 - `pricing.yaml` - Model pricing configuration
 
 ## Notes
+
 - Redis caching and full streaming support are planned for future phases.
 - Metrics for streaming responses are included in the final JSON chunk.

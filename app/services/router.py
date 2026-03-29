@@ -6,69 +6,80 @@
 # If OpenAI is having a "bad day" (503 Service Unavailable), the router silently switches
 # the request to Anthropic or a local Llama instance before the user even notices.
 
-
-from __future__ import annotations
 import asyncio
-import logging
-from typing import Dict, List, Type, Any
-
-# Correct absolute imports
+from asyncio.log import logger
 from app.models.chat import ChatRequest, ChatResponse
 from app.providers.base import BaseLLMAdapter
 from app.providers.openai import OpenAIAdapter
-# from .anthropic_adapter import AnthropicAdapter  <-- Future implementation
-
-logger = logging.getLogger(__name__)
+import httpx
+from typing import Dict, List, Any 
+from app.providers.anthropic import AnthropicAdapter # Ensure this is uncommented
 
 class LLMRouter:
-    def __init__(self, config: Dict[str, Any]):
+    # ... (keep your __init__ and _setup_adapters) ...
+
+    def __init__(self, config: Dict[str, Any], http_client: httpx.AsyncClient):
         self.config = config
-        # Registry of available adapter classes
-        self._adapter_map: Dict[str, Type[BaseLLMAdapter]] = {
+        self.http_client = http_client # Shared client for connection pooling
+        self._adapter_map = {
             "openai": OpenAIAdapter,
-            # "anthropic": AnthropicAdapter,
+            "anthropic": AnthropicAdapter,
         }
         self.adapters: Dict[str, BaseLLMAdapter] = {}
         self._setup_adapters()
 
-    def _setup_adapters(self):
-        """Initialize adapters based on provided config."""
-        for provider, provider_config in self.config.get("providers", {}).items():
-            if provider in self._adapter_map:
-                adapter_cls = self._adapter_map[provider]
-                self.adapters[provider] = adapter_cls(provider_config)
-
     async def route(self, request: ChatRequest) -> ChatResponse:
         """
-        Routes the request with built-in resilience.
-        Strategy: Priority Provider -> Fallback Provider -> Error
+        Policy:
+        1. Try Primary Provider.
+        2. If Primary is 'openai' and fails with 5xx/Timeout, retry once.
+        3. If still failing, fall back to the next available provider.
         """
-        # Determine the primary provider (manual hint or default)
         primary_provider = request.provider_hint or self.config.get("default_provider", "openai")
         
-        # Get the list of providers to try (Primary first, then others)
-        providers_to_try = [primary_provider]
+        # Build the queue: [primary, fallback1, fallback2...]
+        queue = [primary_provider]
         if self.config.get("enable_fallback", True):
-            fallbacks = [p for p in self.adapters.keys() if p != primary_provider]
-            providers_to_try.extend(fallbacks)
+            queue.extend([p for p in self.adapters.keys() if p != primary_provider])
 
         last_exception = None
 
-        for provider_name in providers_to_try:
+        for provider_name in queue:
             adapter = self.adapters.get(provider_name)
             if not adapter:
                 continue
 
-            try:
-                logger.info(f"Routing request to {provider_name}...")
-                return await adapter.complete(request)
+            # --- Retry Logic for OpenAI ---
+            # If it's OpenAI, we try up to 2 times (Initial + 1 Retry)
+            # For others, we try once and move to fallback.
+            max_attempts = 2 if provider_name == "openai" else 1
             
-            except Exception as e:
-                logger.warning(f"Provider {provider_name} failed: {str(e)}")
-                last_exception = e
-                # Continue to the next provider in the loop
-                continue
+            for attempt in range(max_attempts):
+                try:
+                    logger.info(f"Attempt {attempt + 1} for {provider_name}")
+                    return await adapter.complete(request, self.http_client)
 
-        # If we get here, all providers failed
-        logger.error("All LLM providers exhausted.")
-        raise last_exception or RuntimeError("No providers available to handle request.")
+                except httpx.HTTPStatusError as e:
+                    last_exception = e
+                    # 4xx errors are User Errors (Bad Request) - DON'T retry or fall back
+                    if e.response.status_code < 500:
+                        logger.error(f"User Error from {provider_name}: {e}")
+                        raise e
+
+                    # 5xx errors are Provider Errors - Log and check if we should retry
+                    logger.warning(f"{provider_name} Server Error ({e.response.status_code})...")
+
+                except (httpx.TimeoutException, httpx.NetworkError) as e:
+                    last_exception = e
+                    logger.warning(f"{provider_name} Connection Issue: {str(e)}...")
+
+                # If we're here, the attempt failed.
+                # If we have retries left for THIS provider, wait a moment and try again.
+                if attempt < max_attempts - 1:
+                    wait_time = 0.5 # 500ms backoff
+                    await asyncio.sleep(wait_time)
+                else:
+                    # No more retries for this provider, move to next in queue
+                    logger.error(f"Exhausted {provider_name}. Moving to fallback...")
+
+        raise last_exception or RuntimeError("Gateway failed to find an available LLM provider.")
