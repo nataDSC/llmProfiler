@@ -1,0 +1,20 @@
+# Pricing per 1M tokens (Current as of March 2026)
+providers:
+  openai:
+    gpt-4o:
+      input_cost_1m: 5.00
+      output_cost_1m: 15.00
+    gpt-3.5-turbo:
+      input_cost_1m: 0.50
+      output_cost_1m: 1.50
+  anthropic:
+    claude-3-5-sonnet:
+      input_cost_1m: 3.00
+      output_cost_1m: 15.00
+    claude-3-opus:
+      input_cost_1m: 15.00
+      output_cost_1m: 75.00
+  local:
+    llama-3-70b:
+      input_cost_1m: 0.00 # Running on your own hardware!
+      output_cost_1m: 0.00

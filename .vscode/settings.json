@@ -1,0 +1,4 @@
+{
+  "github.copilot.chat.agentDebugLog.enabled": true,
+  "github.copilot.chat.cli.forkSessions.enabled": true
+}
