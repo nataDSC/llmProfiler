@@ -90,3 +90,48 @@ docker-compose up --build
 - FastAPI starts at http://localhost:8000.
 - Prometheus starts at http://localhost:9090 (One can query TTFT and Cost metrics here).
 - Redis starts silently in the background, handling semantic cache.
+
+---
+
+## 🛠️ Setup
+
+1. **Create a Python virtual environment:**
+   ```sh
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+2. **Install dependencies:**
+   ```sh
+   pip install --upgrade pip
+   pip install poetry
+   poetry install
+   ```
+
+## Running the Server
+
+1. **Set environment variables:**
+   - `OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY` (as needed)
+   - Optionally: `DEFAULT_PROVIDER`, `PRICING_PATH`
+
+2. **Start the FastAPI server:**
+   ```sh
+   poetry run uvicorn app.main:app --reload
+   ```
+   The API will be available at http://localhost:8000/v1/chat/completions
+
+## Testing
+
+Run all tests with:
+```sh
+poetry run pytest
+```
+
+## Project Structure
+
+- `app/` - Main application code (adapters, routers, models, services)
+- `tests/` - Test suite
+- `pricing.yaml` - Model pricing configuration
+
+## Notes
+- Redis caching and full streaming support are planned for future phases.
+- Metrics for streaming responses are included in the final JSON chunk.

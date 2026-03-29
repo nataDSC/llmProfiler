@@ -2,9 +2,8 @@ from __future__ import annotations
 import time
 from typing import AsyncGenerator, Dict, Any
 
-from app.providers.openai import AsyncOpenAI
-from base import BaseLLMAdapter
-from models import ChatRequest, ChatResponse, ChatMessage
+from app.providers.base import BaseLLMAdapter
+from app.models.chat import ChatRequest, ChatResponse, ChatMessage
 
 class OpenAIAdapter(BaseLLMAdapter):
     def __init__(self, config: Dict[str, Any]):

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Dict, Any
 import time
 
-from models import ChatRequest, ChatResponse, GatewayMetrics
+from app.models.chat import ChatRequest, ChatResponse
 
 class BaseLLMAdapter(ABC):
     """

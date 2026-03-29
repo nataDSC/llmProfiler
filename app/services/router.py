@@ -12,9 +12,10 @@ import asyncio
 import logging
 from typing import Dict, List, Type, Any
 
-from models import ChatRequest, ChatResponse
-from base import BaseLLMAdapter
-from openai import OpenAIAdapter
+# Correct absolute imports
+from app.models.chat import ChatRequest, ChatResponse
+from app.providers.base import BaseLLMAdapter
+from app.providers.openai import OpenAIAdapter
 # from .anthropic_adapter import AnthropicAdapter  <-- Future implementation
 
 logger = logging.getLogger(__name__)
