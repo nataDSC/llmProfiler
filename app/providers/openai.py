@@ -8,13 +8,13 @@ from app.models.chat import ChatRequest, ChatResponse, ChatMessage
 class OpenAIAdapter(BaseLLMAdapter):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
-        self.client = AsyncOpenAI(api_key=config["api_key"])
+        self.api_key = config["api_key"]
 
-    async def complete(self, request: ChatRequest) -> ChatResponse:
+    async def complete(self, request: ChatRequest, client: Any) -> ChatResponse:
         """Standard non-streaming completion with full metric capture."""
         start_time = time.perf_counter()
-        
-        response = await self.client.chat.completions.create(
+        # Use the provided client (should be an OpenAI client or httpx client wrapper)
+        response = await client.chat.completions.create(
             model=request.model,
             messages=[m.dict() for m in request.messages],
             temperature=request.temperature,
@@ -22,12 +22,10 @@ class OpenAIAdapter(BaseLLMAdapter):
             stream=False
         )
 
-        # Extract token usage from OpenAI's response
         usage = response.usage
         input_tokens = usage.prompt_tokens
         output_tokens = usage.completion_tokens
 
-        # Generate our standardized metrics
         metrics = self._create_metrics(
             model=request.model,
             start_time=start_time,
@@ -44,12 +42,11 @@ class OpenAIAdapter(BaseLLMAdapter):
             metrics=metrics
         )
 
-    async def stream(self, request: ChatRequest) -> AsyncGenerator[Dict[str, Any], None]:
+    async def stream(self, request: ChatRequest, client: Any) -> AsyncGenerator[Dict[str, Any], None]:
         """Streaming completion with TTFT (Time to First Token) tracking."""
         start_time = time.perf_counter()
         ttft = None
-        
-        response = await self.client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=request.model,
             messages=[m.dict() for m in request.messages],
             stream=True

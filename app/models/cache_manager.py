@@ -11,6 +11,9 @@
 # Capture Metrics: Record the TTFT and Cost.
 # Expose Data: Prometheus serves these numbers to Grafana.
 
+from typing import Optional
+
+from app.models.chat import ChatRequest, ChatResponse
 import redis.asyncio as redis
 import hashlib
 import json

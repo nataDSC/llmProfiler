@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Dict, Any
 import time
 
-from app.models.chat import ChatRequest, ChatResponse
+from app.models.chat import ChatRequest, ChatResponse, GatewayMetrics
 
 class BaseLLMAdapter(ABC):
     """
@@ -16,13 +16,13 @@ class BaseLLMAdapter(ABC):
         self.provider_name = config.get("name", "unknown")
 
     @abstractmethod
-    async def complete(self, request: ChatRequest) -> ChatResponse:
-        """Execute a standard (non-streaming) completion."""
+    async def complete(self, request: ChatRequest, client: Any) -> ChatResponse:
+        """Execute a standard (non-streaming) completion. Must use the provided HTTP client."""
         pass
 
     @abstractmethod
-    async def stream(self, request: ChatRequest) -> AsyncGenerator[Dict[str, Any], None]:
-        """Execute a streaming completion."""
+    async def stream(self, request: ChatRequest, client: Any) -> AsyncGenerator[Dict[str, Any], None]:
+        """Execute a streaming completion. Must use the provided HTTP client."""
         pass
 
     def calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
