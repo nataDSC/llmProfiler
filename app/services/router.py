@@ -15,9 +15,8 @@ import httpx
 from typing import Dict, List, Any 
 from app.providers.anthropic import AnthropicAdapter # Ensure this is uncommented
 
-class LLMRouter:
-    # ... (keep your __init__ and _setup_adapters) ...
 
+class LLMRouter:
     def __init__(self, config: Dict[str, Any], http_client: httpx.AsyncClient):
         self.config = config
         self.http_client = http_client # Shared client for connection pooling
@@ -27,6 +26,12 @@ class LLMRouter:
         }
         self.adapters: Dict[str, BaseLLMAdapter] = {}
         self._setup_adapters()
+
+    def _setup_adapters(self):
+        """Initialize adapters based on config and _adapter_map."""
+        for provider, provider_config in self.config.get("providers", {}).items():
+            if provider in self._adapter_map:
+                self.adapters[provider] = self._adapter_map[provider](provider_config)
 
     async def route(self, request: ChatRequest) -> ChatResponse:
         """
