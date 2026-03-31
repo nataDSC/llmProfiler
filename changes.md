@@ -58,3 +58,9 @@
 3. **Connection Pooling**
    - Passing `self.http_client` into adapters uses a single pool of TCP connections.
    - This reduces overhead, allowing handling of thousands of concurrent requests efficiently.
+
+## The profiler changes (refinement)
+
+1. Profiler.py: added a helper to "output" the Pydantic model we need.
+2. Pricing.py: ensure we don't return None (which causes crashes) and handle the 1M token math.
+3. Chat.py route: initial implementation
