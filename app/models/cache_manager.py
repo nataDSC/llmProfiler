@@ -25,7 +25,7 @@ class LLMCache:
 
     def _generate_key(self, request: ChatRequest) -> str:
         """Create a unique hash based on the model and message history."""
-        payload = f"{request.model}:{json.dumps([m.dict() for m in request.messages])}"
+        payload = f"{request.model}:{json.dumps([m.model_dump() for m in request.messages])}"
         return f"llm_cache:{hashlib.sha256(payload.encode()).hexdigest()}"
 
     async def get(self, request: ChatRequest) -> Optional[ChatResponse]:
@@ -39,4 +39,4 @@ class LLMCache:
     async def set(self, request: ChatRequest, response: ChatResponse):
         key = self._generate_key(request)
         # Store for 1 hour to save costs on repetitive prompts
-        await self.client.setex(key, self.ttl, response.json())
+        await self.client.setex(key, self.ttl, response.model_dump_json())

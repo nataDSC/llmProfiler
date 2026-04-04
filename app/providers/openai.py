@@ -14,15 +14,22 @@ class OpenAIAdapter(BaseLLMAdapter):
         self.api_key = config["api_key"]
 
     async def complete(self, request: ChatRequest, client: Any) -> ChatResponse:
+        import logging
+        logger = logging.getLogger(__name__)
         profiler = Profiler()
         profiler.start()
-        response = await client.chat.completions.create(
-            model=request.model,
-            messages=[m.dict() for m in request.messages],
-            temperature=request.temperature,
-            max_tokens=request.max_tokens,
-            stream=False
-        )
+        logger.info(f"OpenAIAdapter: Using API key: {self.api_key[:6]}... (masked)")
+        try:
+            response = await client.chat.completions.create(
+                model=request.model,
+                messages=[m.model_dump() for m in request.messages],
+                temperature=request.temperature,
+                max_tokens=request.max_tokens,
+                stream=False
+            )
+        except Exception as e:
+            logger.error(f"OpenAIAdapter: Exception during completion: {e}")
+            raise
         profiler.end()
 
         usage = response.usage
@@ -51,7 +58,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         ttft = None
         response = await client.chat.completions.create(
             model=request.model,
-            messages=[m.dict() for m in request.messages],
+            messages=[m.model_dump() for m in request.messages],
             stream=True
         )
 

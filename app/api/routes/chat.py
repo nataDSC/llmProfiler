@@ -7,9 +7,9 @@ from app.services.pricing import calculate_request_cost
 from app.services.router import LLMRouter
 from app.core.http import get_http_client # Shared connection pool
 
-router = APIRouter(prefix="/v1")
+router = APIRouter()  # Remove prefix here
 
-@router.post("/chat/completions", response_model=ChatResponse)
+@router.post("/completions", response_model=ChatResponse)
 async def chat_completions(
     request: ChatRequest,
     http_req: Request,
@@ -26,9 +26,13 @@ async def chat_completions(
         if provider_hint:
             request.provider_hint = provider_hint
 
-        # 3. Initialize the Resilient Router
-        # (Pass the shared http_client for connection pooling)
-        config = {"default_provider": "openai", "enable_fallback": True}
+        # 3. Initialize the Resilient Router with full config from settings
+        from app.core.config import settings
+        config = {
+            "default_provider": settings.default_provider,
+            "enable_fallback": True,
+            "providers": settings.providers
+        }
         llm_router = LLMRouter(config, http_client)
 
         # 4. Execute the Request
@@ -67,7 +71,8 @@ async def chat_completions(
 
         # 8. Inject Telemetry into Headers for Observability
         # This allows external monitors to see performance without parsing JSON
-        response.headers["X-Gateway-Metrics"] = final_metrics.json()
+        response.headers["X-Gateway-Metrics"] = final_metrics.model_dump_json()
+        # logger.info(f"Route: Injected telemetry into headers: {final_metrics.model_dump_json()}")
 
         return llm_response
 

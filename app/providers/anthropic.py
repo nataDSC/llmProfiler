@@ -21,8 +21,11 @@ class AnthropicAdapter(BaseLLMAdapter):
 
 
     async def complete(self, request: ChatRequest, client: httpx.AsyncClient) -> ChatResponse:
+        import logging
+        logger = logging.getLogger(__name__)
         profiler = Profiler()
         profiler.start()
+        logger.info(f"AnthropicAdapter: Using API key: {self.api_key[:6]}... (masked)")
         # 1. Extract 'system' message from the array (Anthropic requirement)
         system_msg = next((m.content for m in request.messages if m.role == "system"), None)
         messages = [{"role": m.role, "content": m.content} for m in request.messages if m.role != "system"]
@@ -36,7 +39,11 @@ class AnthropicAdapter(BaseLLMAdapter):
         if system_msg:
             payload["system"] = system_msg
 
-        resp = await client.post(self.base_url, json=payload, headers=self.default_headers, timeout=60)
+        try:
+            resp = await client.post(self.base_url, json=payload, headers=self.default_headers, timeout=60)
+        except Exception as e:
+            logger.error(f"AnthropicAdapter: Exception during completion: {e}")
+            raise
         profiler.end()
         resp.raise_for_status()
         data = resp.json()

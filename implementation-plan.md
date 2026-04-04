@@ -9,8 +9,8 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
 - **Phase 1: Project Scaffolding & Foundation** — done
 - **Phase 2: Provider Adapters & Routing Logic** — done
 - **Phase 3: Profiling, Metrics, and Cost Calculation** — done
-- **Phase 4: Endpoint, Streaming, and Middleware Integration** — started
-- **Phase 5: Caching, Security, and Deployment** — not started
+- **Phase 4: Endpoint, Streaming, and Middleware Integration** — done
+- **Phase 5: Caching, Security, and Deployment** — started
 
 ---
 

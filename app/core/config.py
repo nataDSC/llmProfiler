@@ -1,6 +1,13 @@
+
 import os
 import yaml
 from typing import Dict, Any
+# Ensure .env is loaded before anything else
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 class Settings:
     def __init__(self):
