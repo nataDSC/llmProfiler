@@ -2,8 +2,11 @@ from __future__ import annotations
 import time
 from typing import AsyncGenerator, Dict, Any
 
+
 from app.providers.base import BaseLLMAdapter
 from app.models.chat import ChatRequest, ChatResponse, ChatMessage
+from app.services.profiler import Profiler
+from app.services.pricing import calculate_request_cost
 
 class OpenAIAdapter(BaseLLMAdapter):
     def __init__(self, config: Dict[str, Any]):
@@ -11,9 +14,8 @@ class OpenAIAdapter(BaseLLMAdapter):
         self.api_key = config["api_key"]
 
     async def complete(self, request: ChatRequest, client: Any) -> ChatResponse:
-        """Standard non-streaming completion with full metric capture."""
-        start_time = time.perf_counter()
-        # Use the provided client (should be an OpenAI client or httpx client wrapper)
+        profiler = Profiler()
+        profiler.start()
         response = await client.chat.completions.create(
             model=request.model,
             messages=[m.dict() for m in request.messages],
@@ -21,18 +23,19 @@ class OpenAIAdapter(BaseLLMAdapter):
             max_tokens=request.max_tokens,
             stream=False
         )
+        profiler.end()
 
         usage = response.usage
         input_tokens = usage.prompt_tokens
         output_tokens = usage.completion_tokens
-
-        metrics = self._create_metrics(
+        cost = calculate_request_cost("openai", request.model, input_tokens, output_tokens)
+        metrics = profiler.get_metrics(
+            provider="openai",
             model=request.model,
-            start_time=start_time,
             input_tokens=input_tokens,
-            output_tokens=output_tokens
+            output_tokens=output_tokens,
+            cost=cost
         )
-
         return ChatResponse(
             id=response.id,
             created=response.created,

@@ -64,3 +64,17 @@
 1. Profiler.py: added a helper to "output" the Pydantic model we need.
 2. Pricing.py: ensure we don't return None (which causes crashes) and handle the 1M token math.
 3. Chat.py route: initial implementation
+
+## High performance client
+
+1. http.py: manages a single, high-performance client that all your requests will share.
+2. main.py: for the shared client to work, FastAPI needs to "turn it on" when the server starts and "turn it off" when it stops. We do this using a lifespan function.
+
+   Now, when chat.py calls from app.core.http import get_http_client, the function exists and is ready to be used as a FastAPI Depends().
+   Stability: The Limits we set (max_connections=100) prevent the gateway from accidentally DOS-ing itself or opening too many file handles on the Mac.
+
+3. config.py: error handling and pathing update.
+
+   The Path Library: Using Path(**file**) ensures that the app always finds pricing.yaml in the project root, even if we run the command from ~/Documents or /Users/nataliep/code.
+   Graceful Degradation: By returning {"providers": {}} instead of raising an exception, the API will still start. We'll just get $0.00 for your cost metrics until we fix the YAML file. This is much better than a "silent death" where the server won't even boot.
+   Logging: Using logger.error instead of a standard print(). It allows these errors to show up in the Docker logs or cloud monitoring tools later.

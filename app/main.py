@@ -1,8 +1,16 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.core.config import settings
-from app.api.routes import chat
+from app.core.http import close_http_client
+from app.api.routes import chat # Adjust based on your folder structure
 
-app = FastAPI(title="LLM Gateway & Profiler")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- Startup: The gateway is warming up ---
+    yield
+    # --- Shutdown: The gateway is closing ---
+    await close_http_client()
+
+app = FastAPI(title="LLM Gateway", lifespan=lifespan)
 
 # Register routers
 app.include_router(chat.router, prefix="/v1/chat")

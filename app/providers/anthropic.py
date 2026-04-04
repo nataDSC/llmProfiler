@@ -1,6 +1,9 @@
+
 from app.providers.base import BaseLLMAdapter
 from app.models.chat import ChatRequest, ChatResponse
 from app.core.config import settings
+from app.services.profiler import Profiler
+from app.services.pricing import calculate_request_cost
 import time
 import httpx
 
@@ -16,9 +19,10 @@ class AnthropicAdapter(BaseLLMAdapter):
             "content-type": "application/json",
         }
 
-    async def complete(self, request: ChatRequest, client: httpx.AsyncClient) -> ChatResponse:
-        start_time = time.perf_counter()
 
+    async def complete(self, request: ChatRequest, client: httpx.AsyncClient) -> ChatResponse:
+        profiler = Profiler()
+        profiler.start()
         # 1. Extract 'system' message from the array (Anthropic requirement)
         system_msg = next((m.content for m in request.messages if m.role == "system"), None)
         messages = [{"role": m.role, "content": m.content} for m in request.messages if m.role != "system"]
@@ -32,16 +36,15 @@ class AnthropicAdapter(BaseLLMAdapter):
         if system_msg:
             payload["system"] = system_msg
 
-        # 2. Use the SHARED client passed from the router
         resp = await client.post(self.base_url, json=payload, headers=self.default_headers, timeout=60)
+        profiler.end()
         resp.raise_for_status()
         data = resp.json()
 
-        # 3. Map Anthropic 'content' to OpenAI 'choices' format
         input_tokens = data["usage"]["input_tokens"]
         output_tokens = data["usage"]["output_tokens"]
+        cost = calculate_request_cost("anthropic", payload["model"], input_tokens, output_tokens)
 
-        # Standardize the response structure
         choices = [{
             "index": 0,
             "message": {
@@ -51,12 +54,22 @@ class AnthropicAdapter(BaseLLMAdapter):
             "finish_reason": data.get("stop_reason")
         }]
 
-        # 4. Use the Base Class helper for consistent metrics
-        metrics = self._create_metrics(
+        metrics = profiler.get_metrics(
+            provider="anthropic",
             model=payload["model"],
-            start_time=start_time,
             input_tokens=input_tokens,
-            output_tokens=output_tokens
+            output_tokens=output_tokens,
+            cost=cost
+        )
+
+        return ChatResponse(
+            id=data.get("id", "anthropic-unknown"),
+            object="chat.completion",
+            created=int(time.time()),
+            model=payload["model"],
+            choices=choices,
+            usage={"prompt_tokens": input_tokens, "completion_tokens": output_tokens},
+            metrics=metrics
         )
 
         return ChatResponse(

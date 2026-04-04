@@ -14,3 +14,15 @@ def get_model_pricing(provider: str, model: str) -> Optional[dict]:
         "input": model_pricing.get("input_cost_1m", 0),
         "output": model_pricing.get("output_cost_1m", 0)
     }
+
+def calculate_request_cost(provider: str, model: str, input_tokens: int, output_tokens: int) -> float:
+    # Get rates (using your existing logic)
+    rates = get_model_pricing(provider, model)
+    if not rates:
+        return 0.0
+
+    # Math: (Tokens / 1M) * Rate_Per_1M
+    in_cost = (input_tokens / 1_000_000) * rates.get("input", 0)
+    out_cost = (output_tokens / 1_000_000) * rates.get("output", 0)
+
+    return in_cost + out_cost
