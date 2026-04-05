@@ -13,51 +13,100 @@ router = APIRouter()  # Remove prefix here
 async def chat_completions(
     request: ChatRequest,
     http_req: Request,
-    response: Response,
-    http_client = Depends(get_http_client)
-):
-    # 1. Initialize your Stateful Profiler (The Stopwatch)
-    p = Profiler()
-    p.start()
 
     try:
+        from app.core.config import settings
+        from app.services.cache import HybridCache
+        from app.services.embedding import EmbeddingService
+        import asyncio
+
         # 2. Extract Routing Hints
         provider_hint = http_req.headers.get("X-LLM-Provider")
         if provider_hint:
             request.provider_hint = provider_hint
 
-        # 3. Initialize the Resilient Router with full config from settings
-        from app.core.config import settings
+        # 3. Hybrid Cache Orchestration
+        cache = HybridCache(redis_url=os.getenv("REDIS_URL", "redis://localhost:6379"))
+        embedding_service = EmbeddingService(dims=1536)  # TODO: make dims configurable
+        prompt = request.messages[-1].content if request.messages else ""
+
+        # 3.1. Check Exact Match
+        try:
+            cached_hit, cache_type = await cache.check(prompt)
+            if cached_hit:
+                # Attach new metrics for cache hit
+                from app.models.chat import GatewayMetrics, ChatResponse
+                metrics = p.get_metrics(
+                    provider=f"cache_{cache_type}",
+                    model=request.model,
+                    input_tokens=0,
+                    output_tokens=0,
+                    cost=0.0
+                )
+                # Rebuild ChatResponse with new metrics
+                resp_obj = ChatResponse(**cached_hit["response"], metrics=metrics)
+                response.headers["X-Gateway-Metrics"] = metrics.model_dump_json()
+                logger.info(f"Cache {cache_type} hit for prompt. Returning cached response.")
+                return resp_obj
+        except Exception as e:
+            logger.error(f"Cache exact match failed open: {e}")
+
+        # 3.2. Get Embedding (only if no exact match)
+        try:
+            vector = await embedding_service.get_vector(prompt)
+        except Exception as e:
+            logger.error(f"Embedding service failed open: {e}")
+            vector = None
+
+        # 3.3. Check Semantic Match
+        try:
+            if vector:
+                cached_hit, cache_type = await cache.check(prompt, vector=vector)
+                if cached_hit:
+                    from app.models.chat import GatewayMetrics, ChatResponse
+                    metrics = p.get_metrics(
+                        provider=f"cache_{cache_type}",
+                        model=request.model,
+                        input_tokens=0,
+                        output_tokens=0,
+                        cost=0.0
+                    )
+                    resp_obj = ChatResponse(**cached_hit["response"], metrics=metrics)
+                    response.headers["X-Gateway-Metrics"] = metrics.model_dump_json()
+                    logger.info(f"Cache semantic hit for prompt. Returning cached response.")
+                    return resp_obj
+        except Exception as e:
+            logger.error(f"Cache semantic match failed open: {e}")
+
+        # 4. Fallback to LLM
         config = {
             "default_provider": settings.default_provider,
             "enable_fallback": True,
             "providers": settings.providers
         }
         llm_router = LLMRouter(config, http_client)
-
-        # 4. Execute the Request
-        # The router handles 4xx/5xx logic and fallbacks internally
         llm_response = await llm_router.route(request)
-
-        # 5. Stop the Clock
         p.end()
+
+        # 5. Store result in Cache (background task)
+        async def store_in_cache():
+            try:
+                await cache.store(prompt, llm_response.model_dump(), vector)
+            except Exception as e:
+                logger.error(f"Cache store failed open: {e}")
+        asyncio.create_task(store_in_cache())
 
         # 6. Calculate the "Receipt" (Cost & Metrics)
         provider_used = llm_response.metrics.provider_used
         model_used = llm_response.metrics.model_used
-
         input_tokens = llm_response.usage.get("prompt_tokens", 0)
         output_tokens = llm_response.usage.get("completion_tokens", 0)
-
         cost = calculate_request_cost(
             provider_used,
             model_used,
             input_tokens,
             output_tokens
         )
-
-        # 7. Use your Profiler helper to build the final Metrics object
-        # This keeps the route logic clean and standardized
         final_metrics = p.get_metrics(
             provider=provider_used,
             model=model_used,
@@ -65,9 +114,10 @@ async def chat_completions(
             output_tokens=output_tokens,
             cost=cost
         )
-
-        # Update the response object with our finalized telemetry
         llm_response.metrics = final_metrics
+        response.headers["X-Gateway-Metrics"] = final_metrics.model_dump_json()
+        logger.info(f"Route: Injected telemetry into headers: {final_metrics.model_dump_json()}")
+        return llm_response
 
         # 8. Inject Telemetry into Headers for Observability
         # This allows external monitors to see performance without parsing JSON
