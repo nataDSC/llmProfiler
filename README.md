@@ -77,6 +77,11 @@ Access the Prometheus metrics endpoint at `/metrics` to monitor:
 
 In a production environment, calling LLM APIs directly creates **vendor lock-in** and **unpredictable costs**. This gateway acts as a "Control Plane," allowing engineering teams to optimize for speed or cost dynamically, ensure 99.99% availability through failover, and gain total visibility into AI infrastructure spend.
 
+## Security
+
+- All requests and responses are sanitized for common PII (email, SSN, credit card) using the built-in PII middleware.
+- See `app/middleware/pii.py` for details and patterns. Extend as needed for your use case.
+
 # 🚀 How to Launch
 
 You can launch the entire stack with a single command:

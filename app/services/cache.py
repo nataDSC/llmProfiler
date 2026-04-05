@@ -17,8 +17,11 @@ class HybridCache:
                     "dims": 1536, "algorithm": "hnsw", "distance_metric": "cosine"
                 }}
             ]
-        })
-        self.index.connect(redis_url)
+        }, connection=redis_url)
+        # Ensure index and client are ready
+        if not hasattr(self.index, 'client') or self.index.client is None:
+            self.index.create(overwrite=False)
+        self.client = self.index.client
 
     def _get_hash(self, prompt: str) -> str:
         return hashlib.sha256(prompt.encode()).hexdigest()
@@ -26,7 +29,7 @@ class HybridCache:
     async def check(self, prompt: str, vector: list[float] = None):
         # --- Tier 1: Exact Match ---
         prompt_hash = self._get_hash(prompt)
-        exact_hit = await self.index.client.get(f"exact:{prompt_hash}")
+        exact_hit = self.client.get(f"exact:{prompt_hash}")
         if exact_hit:
             return json.loads(exact_hit), "exact"
 
@@ -45,18 +48,31 @@ class HybridCache:
 
         return None, None
 
-    async def store(self, prompt: str, response: str, vector: list[float]):
+    async def store(self, prompt: str, response: dict, vector: list[float]):
         """Stores result in both Exact and Semantic indexes."""
         prompt_hash = self._get_hash(prompt)
+        # Ensure vector is a list of floats for JSON, bytes for RedisVL
+        vector_list = [float(x) for x in vector] if vector is not None else None
         data = {"prompt": prompt, "response": response}
-        
         # Store Exact
-        await self.index.client.set(f"exact:{prompt_hash}", json.dumps(data), ex=3600)
-        
-        # Store Semantic
-        await self.index.load([{
-            "prompt_hash": prompt_hash,
-            "prompt_vector": vector,
-            "response": json.dumps(data)
-        }])
+        self.client.set(f"exact:{prompt_hash}", json.dumps(data), ex=3600)
+        # Store Semantic (vector as bytes)
+        if vector_list is not None:
+            import numpy as np
+            vector_bytes = np.array(vector_list, dtype=np.float32).tobytes()
+            try:
+                await self.index.load([{
+                    "prompt_hash": prompt_hash,
+                    "prompt_vector": vector_bytes,
+                    "response": json.dumps(data)
+                }])
+            except Exception as e:
+                try:
+                    self.index.load([{
+                        "prompt_hash": prompt_hash,
+                        "prompt_vector": vector_bytes,
+                        "response": json.dumps(data)
+                    }])
+                except Exception as e2:
+                    pass
     

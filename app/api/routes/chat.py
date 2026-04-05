@@ -1,3 +1,5 @@
+
+import os
 from asyncio.log import logger
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -9,11 +11,18 @@ from app.core.http import get_http_client # Shared connection pool
 
 router = APIRouter()  # Remove prefix here
 
+
 @router.post("/completions", response_model=ChatResponse)
 async def chat_completions(
     request: ChatRequest,
     http_req: Request,
+    response: Response,
+    http_client = Depends(get_http_client)
+):
 
+    # 1. Initialize your Stateful Profiler (The Stopwatch)
+    p = Profiler()
+    p.start()
     try:
         from app.core.config import settings
         from app.services.cache import HybridCache
@@ -25,31 +34,38 @@ async def chat_completions(
         if provider_hint:
             request.provider_hint = provider_hint
 
-        # 3. Hybrid Cache Orchestration
-        cache = HybridCache(redis_url=os.getenv("REDIS_URL", "redis://localhost:6379"))
+
+        # 3. Hybrid Cache Orchestration (fail open if Redis is unavailable)
+        cache = None
+        try:
+            cache = HybridCache(redis_url=os.getenv("REDIS_URL", "redis://localhost:6379"))
+        except Exception as e:
+            logger.error(f"HybridCache unavailable, proceeding without cache: {e}")
         embedding_service = EmbeddingService(dims=1536)  # TODO: make dims configurable
         prompt = request.messages[-1].content if request.messages else ""
 
         # 3.1. Check Exact Match
-        try:
-            cached_hit, cache_type = await cache.check(prompt)
-            if cached_hit:
-                # Attach new metrics for cache hit
-                from app.models.chat import GatewayMetrics, ChatResponse
-                metrics = p.get_metrics(
-                    provider=f"cache_{cache_type}",
-                    model=request.model,
-                    input_tokens=0,
-                    output_tokens=0,
-                    cost=0.0
-                )
-                # Rebuild ChatResponse with new metrics
-                resp_obj = ChatResponse(**cached_hit["response"], metrics=metrics)
-                response.headers["X-Gateway-Metrics"] = metrics.model_dump_json()
-                logger.info(f"Cache {cache_type} hit for prompt. Returning cached response.")
-                return resp_obj
-        except Exception as e:
-            logger.error(f"Cache exact match failed open: {e}")
+        if cache:
+            try:
+                cached_hit, cache_type = await cache.check(prompt)
+                if cached_hit:
+                    from app.models.chat import GatewayMetrics, ChatResponse
+                    p.end()
+                    metrics = p.get_metrics(
+                        provider=f"cache_{cache_type}",
+                        model=request.model,
+                        input_tokens=0,
+                        output_tokens=0,
+                        cost=0.0
+                    )
+                    resp_data = dict(cached_hit["response"])
+                    resp_data.pop("metrics", None)
+                    resp_obj = ChatResponse(**resp_data, metrics=metrics)
+                    response.headers["X-Gateway-Metrics"] = metrics.model_dump_json()
+                    logger.info(f"Cache {cache_type} hit for prompt. Returning cached response.")
+                    return resp_obj
+            except Exception as e:
+                logger.error(f"Cache exact match failed open: {e}")
 
         # 3.2. Get Embedding (only if no exact match)
         try:
@@ -59,24 +75,28 @@ async def chat_completions(
             vector = None
 
         # 3.3. Check Semantic Match
-        try:
-            if vector:
-                cached_hit, cache_type = await cache.check(prompt, vector=vector)
-                if cached_hit:
-                    from app.models.chat import GatewayMetrics, ChatResponse
-                    metrics = p.get_metrics(
-                        provider=f"cache_{cache_type}",
-                        model=request.model,
-                        input_tokens=0,
-                        output_tokens=0,
-                        cost=0.0
-                    )
-                    resp_obj = ChatResponse(**cached_hit["response"], metrics=metrics)
-                    response.headers["X-Gateway-Metrics"] = metrics.model_dump_json()
-                    logger.info(f"Cache semantic hit for prompt. Returning cached response.")
-                    return resp_obj
-        except Exception as e:
-            logger.error(f"Cache semantic match failed open: {e}")
+        if cache:
+            try:
+                if vector:
+                    cached_hit, cache_type = await cache.check(prompt, vector=vector)
+                    if cached_hit:
+                        from app.models.chat import GatewayMetrics, ChatResponse
+                        p.end()
+                        metrics = p.get_metrics(
+                            provider=f"cache_{cache_type}",
+                            model=request.model,
+                            input_tokens=0,
+                            output_tokens=0,
+                            cost=0.0
+                        )
+                        resp_data = dict(cached_hit["response"])
+                        resp_data.pop("metrics", None)
+                        resp_obj = ChatResponse(**resp_data, metrics=metrics)
+                        response.headers["X-Gateway-Metrics"] = metrics.model_dump_json()
+                        logger.info(f"Cache semantic hit for prompt. Returning cached response.")
+                        return resp_obj
+            except Exception as e:
+                logger.error(f"Cache semantic match failed open: {e}")
 
         # 4. Fallback to LLM
         config = {
