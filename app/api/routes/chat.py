@@ -1,3 +1,4 @@
+from app.middleware.pii import redact_all_strings
 
 import os
 from asyncio.log import logger
@@ -21,6 +22,7 @@ async def chat_completions(
 ):
 
     # 1. Initialize your Stateful Profiler (The Stopwatch)
+    from app.models.chat import GatewayMetrics, ChatResponse
     p = Profiler()
     p.start()
     try:
@@ -60,7 +62,9 @@ async def chat_completions(
                     )
                     resp_data = dict(cached_hit["response"])
                     resp_data.pop("metrics", None)
-                    resp_obj = ChatResponse(**resp_data, metrics=metrics)
+                    # Redact PII in the outgoing response
+                    redacted_resp_data = redact_all_strings(resp_data)
+                    resp_obj = ChatResponse(**redacted_resp_data, metrics=metrics)
                     response.headers["X-Gateway-Metrics"] = metrics.model_dump_json()
                     logger.info(f"Cache {cache_type} hit for prompt. Returning cached response.")
                     return resp_obj
@@ -91,7 +95,9 @@ async def chat_completions(
                         )
                         resp_data = dict(cached_hit["response"])
                         resp_data.pop("metrics", None)
-                        resp_obj = ChatResponse(**resp_data, metrics=metrics)
+                        # Redact PII in the outgoing response
+                        redacted_resp_data = redact_all_strings(resp_data)
+                        resp_obj = ChatResponse(**redacted_resp_data, metrics=metrics)
                         response.headers["X-Gateway-Metrics"] = metrics.model_dump_json()
                         logger.info(f"Cache semantic hit for prompt. Returning cached response.")
                         return resp_obj
@@ -107,6 +113,9 @@ async def chat_completions(
         llm_router = LLMRouter(config, http_client)
         llm_response = await llm_router.route(request)
         p.end()
+        # Redact PII in the outgoing LLM response
+        redacted_llm_response = redact_all_strings(llm_response.model_dump())
+        llm_response = ChatResponse(**redacted_llm_response)
 
         # 5. Store result in Cache (background task)
         async def store_in_cache():

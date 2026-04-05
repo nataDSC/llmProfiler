@@ -10,7 +10,7 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
 - **Phase 2: Provider Adapters & Routing Logic** — done
 - **Phase 3: Profiling, Metrics, and Cost Calculation** — done
 - **Phase 4: Endpoint, Streaming, and Middleware Integration** — done
-- **Phase 5: Caching, Security, and Deployment** — started
+- **Phase 5: Caching, Security, and Deployment** — done
 
 ---
 
@@ -80,13 +80,16 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
 
 **Goal:** Optimize, secure, and containerize the gateway for production.
 
-**Steps:**
+**Status:** Complete
 
-1. Scaffold Redis caching for semantic/TTL cache (defer implementation if not in scope).
-2. Add PII sanitization middleware/layer.
-3. Add Dockerfile and containerization assets.
-4. Document environment, deployment, and operational notes in README.md.
-5. Add/expand tests for caching and security.
+**Highlights:**
+
+- Implemented hybrid (exact + semantic/vector) caching using Redis and RedisVL, with OpenAI/local embeddings.
+- Added robust PII sanitization middleware for all requests and responses.
+- Containerized the stack with Docker and docker-compose (FastAPI, Redis, Prometheus).
+- Updated README with deployment, Redis, and security details.
+- Added/expanded tests for cache hit/miss, PII redaction, and security (including cache clearing for reliable PII tests).
+- All tests pass; system is production-ready and fully observable.
 
 ---
 

@@ -11,10 +11,24 @@ PII_PATTERNS = [
 
 REDACTION = "[REDACTED]"
 
+
 def redact_pii(text: str) -> str:
     for pattern in PII_PATTERNS:
         text = pattern.sub(REDACTION, text)
     return text
+
+# Recursively redact all string values in a nested structure
+def redact_all_strings(obj):
+    if isinstance(obj, str):
+        return redact_pii(obj)
+    elif isinstance(obj, dict):
+        return {k: redact_all_strings(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [redact_all_strings(i) for i in obj]
+    elif isinstance(obj, tuple):
+        return tuple(redact_all_strings(i) for i in obj)
+    else:
+        return obj
 
 class PIISanitizerMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -47,11 +61,13 @@ class PIISanitizerMiddleware(BaseHTTPMiddleware):
                         return {k: redact_all_strings(v) for k, v in obj.items()}
                     elif isinstance(obj, list):
                         return [redact_all_strings(i) for i in obj]
+                    elif isinstance(obj, tuple):
+                        return tuple(redact_all_strings(i) for i in obj)
                     else:
                         return obj
                 redacted_data = redact_all_strings(data)
                 from fastapi.responses import JSONResponse
-                response = JSONResponse(content=redacted_data, status_code=response.status_code, headers=dict(response.headers))
+                return JSONResponse(content=redacted_data, status_code=response.status_code, headers=dict(response.headers))
             except Exception:
                 pass
         return response

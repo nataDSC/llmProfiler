@@ -25,12 +25,18 @@ def test_cache_exact_match(client):
     assert "cache_exact" in metrics or "cache" in metrics
 
 def test_pii_redaction(client):
+    # Clear Redis cache before test to ensure the LLM echo adapter is exercised and not a cached refusal or previous response.
+    # This is necessary for reliably testing PII redaction logic.
+    import redis
+    r = redis.Redis.from_url("redis://localhost:6379")
+    r.flushdb()
     payload = {
         "model": "gpt-3.5-turbo",
         "messages": [{"role": "user", "content": "My email is alice@example.com and my SSN is 123-45-6789."}],
         "stream": False
     }
     response = client.post("/v1/chat/completions", json=payload)
+    print("PII Redaction Test Response:", response.text)
     assert response.status_code == 200
     # The response body should not contain the email or SSN
     assert "alice@example.com" not in response.text
