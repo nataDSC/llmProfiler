@@ -11,6 +11,7 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
 - **Phase 3: Profiling, Metrics, and Cost Calculation** — done
 - **Phase 4: Endpoint, Streaming, and Middleware Integration** — done
 - **Phase 5: Caching, Security, and Deployment** — done
+- **Phase 6: Advanced Caching Strategy (Planned)** — planned
 
 ---
 
@@ -90,6 +91,46 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
 - Updated README with deployment, Redis, and security details.
 - Added/expanded tests for cache hit/miss, PII redaction, and security (including cache clearing for reliable PII tests).
 - All tests pass; system is production-ready and fully observable.
+
+---
+
+## Phase 6: Advanced Caching Strategy (Planned)
+
+**Goal:** Make caching smarter and more production-ready by supporting tiered TTLs, cache categories, and stale-while-revalidate for semantic and exact cache entries.
+
+**Steps:**
+
+1. **Category-Based TTLs**
+   - Define cache categories (e.g., fact-based, creative, code, volatile) and their recommended TTLs in config.
+   - Allow the caller (endpoint or router) to specify a cache category or priority for each request.
+   - In `HybridCache.store`, select the TTL based on the category, falling back to a default if not provided.
+
+2. **Tiered TTL Logic**
+   - For exact matches, set the TTL on the Redis key using the selected TTL.
+   - For semantic/vector matches, after storing the hash/vector, manually set the expiry on the Redis hash key using the selected TTL.
+
+3. **Stale-While-Revalidate**
+   - When serving a cache hit:
+     - If the entry is within the "fresh" window (e.g., <24h), return immediately.
+     - If the entry is "stale" (e.g., 24–48h), return the cached value but trigger a background refresh from the LLM to update the cache for the next user.
+   - Store a `cached_at` timestamp in each cache entry to support this logic.
+
+4. **Volatile/No-Cache Handling**
+   - For highly volatile queries (e.g., real-time data), allow the caller to specify "do not cache" and bypass the cache entirely.
+
+5. **Metadata and Freshness Checks**
+   - Store metadata (e.g., `cached_at`, `model`) in all cache entries.
+   - On cache lookup, check the age of the entry and the user's freshness requirements before returning a hit.
+
+6. **Configurable Defaults**
+   - Make all TTLs, category mappings, and freshness windows configurable via settings.
+
+7. **Testing**
+   - Add/expand tests for:
+     - Category-based TTL selection and expiry
+     - Stale-while-revalidate logic (including background refresh)
+     - Metadata and freshness checks
+     - No-cache/volatile bypass
 
 ---
 
