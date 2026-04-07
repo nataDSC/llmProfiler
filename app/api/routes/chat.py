@@ -46,10 +46,21 @@ async def chat_completions(
         embedding_service = EmbeddingService(dims=1536)  # TODO: make dims configurable
         prompt = request.messages[-1].content if request.messages else ""
 
-        # 3.1. Check Exact Match
+        # 3.1. Check Exact Match (with stale-while-revalidate)
+        async def refresh_cache(prompt, cached_data):
+            # This will run in the background for stale cache entries
+            try:
+                logger.info(f"Refreshing stale cache for prompt: {prompt}")
+                # Re-run LLM and update cache
+                new_vector = await embedding_service.get_vector(prompt)
+                new_llm_response = await llm_router.route(request)
+                await cache.store(prompt, new_llm_response.model_dump(), new_vector)
+            except Exception as e:
+                logger.error(f"Background cache refresh failed: {e}")
+
         if cache:
             try:
-                cached_hit, cache_type = await cache.check(prompt)
+                cached_hit, cache_type = await cache.check(prompt, trigger_refresh=lambda p, d: asyncio.create_task(refresh_cache(p, d)))
                 if cached_hit:
                     from app.models.chat import GatewayMetrics, ChatResponse
                     p.end()
@@ -78,11 +89,11 @@ async def chat_completions(
             logger.error(f"Embedding service failed open: {e}")
             vector = None
 
-        # 3.3. Check Semantic Match
+        # 3.3. Check Semantic Match (with stale-while-revalidate)
         if cache:
             try:
                 if vector:
-                    cached_hit, cache_type = await cache.check(prompt, vector=vector)
+                    cached_hit, cache_type = await cache.check(prompt, vector=vector, trigger_refresh=lambda p, d: asyncio.create_task(refresh_cache(p, d)))
                     if cached_hit:
                         from app.models.chat import GatewayMetrics, ChatResponse
                         p.end()

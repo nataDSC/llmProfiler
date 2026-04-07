@@ -11,6 +11,17 @@ except ImportError:
 
 class Settings:
     def __init__(self):
+        # Stale-while-revalidate windows (in seconds)
+        self.cache_fresh_window = 86400   # 24h: serve from cache immediately
+        self.cache_stale_window = 172800  # 48h: serve stale, trigger refresh
+        # Category-based TTLs (in seconds)
+        self.cache_ttl_seconds = 86400  # Default: 24h
+        self.cache_category_ttls = {
+            "fact": 604800,         # 7 days
+            "creative": 21600,     # 6 hours
+            "code": 432000,        # 5 days
+            "volatile": 0,         # Do not cache
+        }
         self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
         self.default_provider = os.getenv("DEFAULT_PROVIDER", "openai")

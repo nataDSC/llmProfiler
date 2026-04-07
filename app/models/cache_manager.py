@@ -20,8 +20,10 @@ import json
 
 class LLMCache:
     def __init__(self, redis_url: str = "redis://localhost:6379"):
+        from app.core.config import settings
         self.client = redis.from_url(redis_url, decode_responses=True)
-        self.ttl = 3600  # 1 hour default
+        self.default_ttl = settings.cache_ttl_seconds
+        self.category_ttls = settings.cache_category_ttls
 
     def _generate_key(self, request: ChatRequest) -> str:
         """Create a unique hash based on the model and message history."""
@@ -36,7 +38,14 @@ class LLMCache:
             return ChatResponse.parse_raw(cached_data)
         return None
 
-    async def set(self, request: ChatRequest, response: ChatResponse):
+    async def set(self, request: ChatRequest, response: ChatResponse, category: str = None):
+        import time
         key = self._generate_key(request)
-        # Store for 1 hour to save costs on repetitive prompts
-        await self.client.setex(key, self.ttl, response.model_dump_json())
+        # Determine TTL
+        ttl = self.category_ttls.get(category, self.default_ttl)
+        if ttl == 0:
+            return  # Do not cache volatile queries
+        # Add cached_at metadata
+        data = response.model_dump()
+        data["cached_at"] = time.time()
+        await self.client.setex(key, ttl, json.dumps(data))
