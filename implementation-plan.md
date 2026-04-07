@@ -11,7 +11,7 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
 - **Phase 3: Profiling, Metrics, and Cost Calculation** — done
 - **Phase 4: Endpoint, Streaming, and Middleware Integration** — done
 - **Phase 5: Caching, Security, and Deployment** — done
-- **Phase 6: Advanced Caching Strategy (Planned)** — planned
+- **Phase 6: Advanced Caching Strategy** — done
 
 ---
 
@@ -94,9 +94,21 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
 
 ---
 
-## Phase 6: Advanced Caching Strategy (Planned)
+## Phase 6: Advanced Caching Strategy
+
+**Status:** Complete (April 2026)
 
 **Goal:** Make caching smarter and more production-ready by supporting tiered TTLs, cache categories, and stale-while-revalidate for semantic and exact cache entries.
+
+**Highlights:**
+
+- Implemented category-based TTLs and cache category mapping in config and cache classes.
+- Added tiered TTL logic for both exact and semantic/vector cache entries.
+- Integrated stale-while-revalidate: stale cache hits are served and trigger async background refresh.
+- Metadata (`cached_at`, `model`, etc.) and freshness checks are enforced on all cache lookups.
+- Volatile/no-cache category is supported and bypasses cache as required.
+- All TTLs, category mappings, and freshness windows are configurable.
+- Tests cover category TTL, stale-while-revalidate, metadata/freshness, and no-cache logic.
 
 **Steps:**
 
@@ -142,4 +154,46 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
 
 ---
 
-This plan should be updated as requirements evolve or as new phases are added.
+
+---
+
+## Phase 7: UI & Demo Experience
+
+**Goal:** Deliver a production-grade, developer-focused UI and demo experience that showcases the gateway’s unique value: traceability, policy-driven routing, PII handling, and real-time metrics.
+
+**Highlights:**
+- Streamlit-based UI for rapid local and cloud deployment (integrates with FastAPI backend).
+- "Execution Trace" panel visualizes the full inference path for every request (PII check, cache hits/misses, router logic, etc.).
+- Sidebar "Policy Engine" lets users select routing policies (e.g., Penny Pincher, Speed Demon, High Fidelity, Chaos Mode for failover simulation).
+- Dual-view chat area: shows both "User Sent" and "Gateway Received" (PII redaction demo).
+- Metrics dashboard: displays total savings, latency delta, cache efficiency (pie chart), and other key stats.
+- Admin panel: includes manual cache invalidation for live demo of semantic cache dynamics.
+- Docker Compose setup for local development: FastAPI, Redis, Streamlit UI.
+
+**Steps:**
+1. **User Story Expansion**
+   - Add a "Traceability" story: As a backend engineer, I want to see a step-by-step execution trace for every request, so I can verify gateway logic and cache behavior.
+
+2. **Tech Stack & Integration**
+   - Use Streamlit for the UI, running on port 8501, talking to FastAPI (port 8000).
+   - Prepare for AWS deployment: UI as a separate container/service.
+
+3. **UI Features**
+   - **Execution Trace Panel:** Waterfall view of each step (PII, cache, embedding, router, etc.) with timing and status.
+   - **Sidebar Policy Engine:** Routing policy selector (Penny Pincher, Speed Demon, High Fidelity, Chaos Mode for error simulation).
+   - **Dual Chat View:** Show both original and redacted input side-by-side.
+   - **Metrics Dashboard:** Big-number stats, latency deltas, cache efficiency pie chart.
+   - **Admin Panel:** Manual cache invalidation button for demoing semantic cache refresh.
+
+4. **Demo Workflow**
+   - Demonstrate cache hit/miss, semantic similarity, and manual cache invalidation live.
+   - Use Chaos Mode to simulate provider errors and show real-time failover.
+
+5. **Local-to-Cloud Bridge**
+   - Extend Docker Compose to include Streamlit UI alongside FastAPI and Redis for seamless local development and demo.
+
+6. **Testing & Polish**
+   - Add/expand tests for API endpoints supporting the UI (trace, metrics, cache control).
+   - Document demo scenarios and UI usage in README.
+
+**Status:** Planned

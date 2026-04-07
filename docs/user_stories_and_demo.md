@@ -5,6 +5,9 @@
 - **Cost Control & Observability for AI Teams:**
   - As an AI platform engineer, I want to route all LLM traffic through a single gateway, so I can monitor usage, track costs, and optimize provider selection without changing client code.
 
+- **The "Traceability" Story:**
+  - As a backend engineer, I want to see a step-by-step 'Execution Trace' for every request, so I can verify exactly why the gateway chose a specific provider or why a semantic cache hit was triggered.
+
 - **Seamless Provider Failover:**
   - As a developer integrating LLMs into my app, I want my requests to automatically fail over to Anthropic if OpenAI is down, so my users always get a response.
 
