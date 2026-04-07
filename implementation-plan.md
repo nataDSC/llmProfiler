@@ -154,7 +154,6 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
 
 ---
 
-
 ---
 
 ## Phase 7: UI & Demo Experience
@@ -162,6 +161,7 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
 **Goal:** Deliver a production-grade, developer-focused UI and demo experience that showcases the gateway’s unique value: traceability, policy-driven routing, PII handling, and real-time metrics.
 
 **Highlights:**
+
 - Streamlit-based UI for rapid local and cloud deployment (integrates with FastAPI backend).
 - "Execution Trace" panel visualizes the full inference path for every request (PII check, cache hits/misses, router logic, etc.).
 - Sidebar "Policy Engine" lets users select routing policies (e.g., Penny Pincher, Speed Demon, High Fidelity, Chaos Mode for failover simulation).
@@ -171,6 +171,7 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
 - Docker Compose setup for local development: FastAPI, Redis, Streamlit UI.
 
 **Steps:**
+
 1. **User Story Expansion**
    - Add a "Traceability" story: As a backend engineer, I want to see a step-by-step execution trace for every request, so I can verify gateway logic and cache behavior.
 
@@ -178,12 +179,39 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
    - Use Streamlit for the UI, running on port 8501, talking to FastAPI (port 8000).
    - Prepare for AWS deployment: UI as a separate container/service.
 
-3. **UI Features**
+3. **UI Features & Senior Architecture**
    - **Execution Trace Panel:** Waterfall view of each step (PII, cache, embedding, router, etc.) with timing and status.
    - **Sidebar Policy Engine:** Routing policy selector (Penny Pincher, Speed Demon, High Fidelity, Chaos Mode for error simulation).
-   - **Dual Chat View:** Show both original and redacted input side-by-side.
+   - **Chaos Mode:** UI toggle sends `X-Simulate-Error` header to trigger simulated provider failures; FastAPI middleware and router logic handle and trace simulated errors for demo and testing.
+   - **Dual Chat View:** Show both original and redacted input side-by-side (demonstrates PII redaction before LLM/cache).
    - **Metrics Dashboard:** Big-number stats, latency deltas, cache efficiency pie chart.
    - **Admin Panel:** Manual cache invalidation button for demoing semantic cache refresh.
+   - **PII Blocked Badge:** UI highlights when PII is detected and redacted, reinforcing compliance and security.
+   - **Rate Limiting Feedback:** UI displays rate limit status (429) if triggered, with clear messaging.
+
+4. **Infrastructure & Local-to-Cloud Bridge**
+   - Project structure: `gateway/` (FastAPI), `ui/` (Streamlit), `docker-compose.yml`, `.env` for secrets.
+   - Use `redis/redis-stack-server` for vector search and RedisInsight UI (port 8001) for debugging.
+   - Docker Compose orchestrates all services with healthchecks and service discovery (no IPs, just service names).
+   - Volumes for Redis persistence.
+   - Documented local launch: `docker-compose up --build` brings up UI, API, and cache with correct networking.
+
+5. **Backend Enhancements**
+   - **Chaos Middleware:** FastAPI middleware inspects `X-Simulate-Error` and sets request state for router to simulate provider failures.
+   - **Router Integration:** LLMRouter checks for simulated error and raises HTTP 500 for the targeted provider.
+   - **PII Redaction:** Regex-based redaction (email, phone, credit card, etc.) in `app/core/security.py`, applied before logging, caching, or LLM call.
+   - **Rate Limiting:** Redis-backed token bucket or fixed window limiter in `app/core/limiter.py`, enforced via dependency or middleware; 429 returned if exceeded.
+
+6. **Demo Workflow**
+   - Demonstrate cache hit/miss, semantic similarity, and manual cache invalidation live.
+   - Use Chaos Mode to simulate provider errors and show real-time failover.
+   - Show PII redaction in action and rate limiting feedback.
+
+7. **Testing & Polish**
+   - Add/expand tests for API endpoints supporting the UI (trace, metrics, cache control, chaos, rate limiting, PII redaction).
+   - Document demo scenarios, UI usage, and local/cloud deployment in README.
+
+**Status:** Planned
 
 4. **Demo Workflow**
    - Demonstrate cache hit/miss, semantic similarity, and manual cache invalidation live.
