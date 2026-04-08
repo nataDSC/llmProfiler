@@ -148,6 +148,18 @@ Run all tests with:
 poetry run pytest
 ```
 
+## Running UI Tests
+
+To run the automated UI tests (from the project root):
+
+```
+cd ui
+pytest test_ui_basic.py
+```
+
+- Make sure the FastAPI backend is running and accessible at http://localhost:8000 before running UI tests.
+- The tests will launch the Streamlit UI in the background and check both backend and UI endpoints.
+
 ## Project Structure
 
 - `app/` - Main application code (adapters, routers, models, services)
