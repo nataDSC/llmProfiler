@@ -25,6 +25,7 @@ async def chat_completions(
     from app.models.chat import GatewayMetrics, ChatResponse
     p = Profiler()
     p.start()
+    trace_steps = []
     try:
         from app.core.config import settings
         from app.services.cache import HybridCache
@@ -60,6 +61,7 @@ async def chat_completions(
 
         if cache:
             try:
+                trace_steps.append("Checked cache for exact match")
                 cached_hit, cache_type = await cache.check(prompt, trigger_refresh=lambda p, d: asyncio.create_task(refresh_cache(p, d)))
                 if cached_hit:
                     from app.models.chat import GatewayMetrics, ChatResponse
@@ -78,12 +80,15 @@ async def chat_completions(
                     resp_obj = ChatResponse(**redacted_resp_data, metrics=metrics)
                     response.headers["X-Gateway-Metrics"] = metrics.model_dump_json()
                     logger.info(f"Cache {cache_type} hit for prompt. Returning cached response.")
+                    trace_steps.append(f"Cache {cache_type} hit for prompt. Returning cached response.")
+                    resp_obj.trace = " | ".join(trace_steps)
                     return resp_obj
             except Exception as e:
                 logger.error(f"Cache exact match failed open: {e}")
 
         # 3.2. Get Embedding (only if no exact match)
         try:
+            trace_steps.append("Getting embedding for prompt")
             vector = await embedding_service.get_vector(prompt)
         except Exception as e:
             logger.error(f"Embedding service failed open: {e}")
@@ -93,6 +98,7 @@ async def chat_completions(
         if cache:
             try:
                 if vector:
+                    trace_steps.append("Checked cache for semantic match")
                     cached_hit, cache_type = await cache.check(prompt, vector=vector, trigger_refresh=lambda p, d: asyncio.create_task(refresh_cache(p, d)))
                     if cached_hit:
                         from app.models.chat import GatewayMetrics, ChatResponse
@@ -111,6 +117,8 @@ async def chat_completions(
                         resp_obj = ChatResponse(**redacted_resp_data, metrics=metrics)
                         response.headers["X-Gateway-Metrics"] = metrics.model_dump_json()
                         logger.info(f"Cache semantic hit for prompt. Returning cached response.")
+                        trace_steps.append(f"Cache {cache_type} semantic hit for prompt. Returning cached response.")
+                        resp_obj.trace = " | ".join(trace_steps)
                         return resp_obj
             except Exception as e:
                 logger.error(f"Cache semantic match failed open: {e}")
@@ -121,12 +129,14 @@ async def chat_completions(
             "enable_fallback": True,
             "providers": settings.providers
         }
+        trace_steps.append("Routing to LLM provider")
         llm_router = LLMRouter(config, http_client)
         llm_response = await llm_router.route(request)
         p.end()
         # Redact PII in the outgoing LLM response
         redacted_llm_response = redact_all_strings(llm_response.model_dump())
         llm_response = ChatResponse(**redacted_llm_response)
+        llm_response.trace = " | ".join(trace_steps)
 
         # 5. Store result in Cache (background task)
         async def store_in_cache():

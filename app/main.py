@@ -2,6 +2,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.core.http import close_http_client
 from app.api.routes import chat # Adjust based on your folder structure
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from fastapi.responses import Response
 
 from app.middleware.metrics import metrics_middleware
 from app.middleware.pii import PIISanitizerMiddleware
@@ -23,3 +25,7 @@ app.middleware("http")(metrics_middleware)
 
 # Register routers
 app.include_router(chat.router, prefix="/v1/chat")
+
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

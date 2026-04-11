@@ -36,3 +36,4 @@ class ChatResponse(BaseModel):
     choices: List[Dict[str, Any]]
     usage: Dict[str, int]
     metrics: GatewayMetrics  # The "Secret Sauce" of your project
+    trace: Optional[str] = None  # Optional trace/debug info

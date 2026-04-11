@@ -41,6 +41,7 @@ class LLMRouter:
                 self.adapters[provider] = self._adapter_map[provider](provider_config)
 
     async def route(self, request: ChatRequest) -> ChatResponse:
+        print("[DEBUG] Entered LLMRouter.route() with request:", request)
         """
         Policy:
         1. Try Primary Provider.
@@ -57,6 +58,7 @@ class LLMRouter:
         last_exception = None
 
         for provider_name in queue:
+            print(f"[DEBUG] Trying provider: {provider_name}")
             logger.info(f"Router: Trying provider '{provider_name}' with config: {self.config['providers'].get(provider_name, {})}")
             adapter = self.adapters.get(provider_name)
             if not adapter:
@@ -75,9 +77,14 @@ class LLMRouter:
             max_attempts = 2 if provider_name == "openai" else 1
 
             for attempt in range(max_attempts):
+                print(f"[DEBUG] Attempt {attempt + 1} for provider {provider_name}")
                 try:
                     logger.info(f"Attempt {attempt + 1} for {provider_name}")
+                    logger.info(f"LLMRouter: Calling adapter.complete for provider '{provider_name}' with prompt: {request.messages[-1].content if request.messages else ''}")
+                    print(f"[DEBUG] Calling adapter.complete for provider '{provider_name}' with prompt: {request.messages[-1].content if request.messages else ''}")
                     result = await adapter.complete(request, client)
+                    print(f"[DEBUG] Received response from provider '{provider_name}': {result}")
+                    logger.info(f"LLMRouter: Received response from provider '{provider_name}': {result}")
                     logger.info(f"Router: Provider '{provider_name}' succeeded on attempt {attempt + 1}")
                     return result
 
@@ -107,5 +114,7 @@ class LLMRouter:
                 else:
                     # No more retries for this provider, move to next in queue
                     logger.error(f"Exhausted {provider_name}. Moving to fallback...")
+            print(f"[DEBUG] Finished attempts for provider: {provider_name}")
 
+        print("[DEBUG] All providers exhausted. Raising error.")
         raise last_exception or RuntimeError("Gateway failed to find an available LLM provider.")

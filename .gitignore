@@ -10,8 +10,9 @@ venv/
 # VSCode
 .vscode/
 
-# Poetry
+# Poetry and uv
 poetry.lock
+uv.lock
 
 # OS
 .DS_Store

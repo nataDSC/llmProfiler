@@ -1,0 +1,9 @@
+fastapi>=0.110.0
+uvicorn[standard]
+redis>=5.0.0
+redisvl>=0.16.0
+httpx
+pydantic>=2.6.0
+python-dotenv
+prometheus_client
+openai

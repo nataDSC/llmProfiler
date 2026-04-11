@@ -14,26 +14,58 @@ class OpenAIAdapter(BaseLLMAdapter):
         self.api_key = config["api_key"]
 
     async def complete(self, request: ChatRequest, client: Any) -> ChatResponse:
-        # For testing: always echo the last user message as the LLM response (for PII redaction test)
+        import os
         import time
         from app.models.chat import ChatResponse, GatewayMetrics
         profiler = Profiler()
         profiler.start()
         user_message = request.messages[-1].content if request.messages else ""
+        echo_mode = os.getenv("ECHO_MODE", "false").lower() in ("1", "true", "yes")
+        if echo_mode:
+            profiler.end()
+            metrics = profiler.get_metrics(
+                provider="openai",
+                model=request.model,
+                input_tokens=len(user_message.split()),
+                output_tokens=len(user_message.split()),
+                cost=0.0
+            )
+            return ChatResponse(
+                id="chatcmpl-echo-test",
+                created=int(time.time()),
+                model=request.model,
+                choices=[{"message": {"role": "assistant", "content": user_message, "original_content": user_message}, "finish_reason": "stop", "index": 0}],
+                usage={"prompt_tokens": len(user_message.split()), "completion_tokens": len(user_message.split())},
+                metrics=metrics
+            )
+        # --- Real OpenAI API call ---
+        response = await client.chat.completions.create(
+            model=request.model,
+            messages=[m.model_dump() for m in request.messages],
+        )
         profiler.end()
+        # Extract the response
+        choice = response.choices[0]
+        content = choice.message.content
+        # Save the original content for UI display
         metrics = profiler.get_metrics(
             provider="openai",
             model=request.model,
-            input_tokens=len(user_message.split()),
-            output_tokens=len(user_message.split()),
-            cost=0.0
+            input_tokens=response.usage.prompt_tokens,
+            output_tokens=response.usage.completion_tokens,
+            cost=calculate_request_cost(
+                "openai",
+                request.model,
+                response.usage.prompt_tokens,
+                response.usage.completion_tokens
+            )
         )
         return ChatResponse(
-            id="chatcmpl-echo-test",
+            id=response.id,
             created=int(time.time()),
-            model=request.model,
-            choices=[{"message": {"role": "assistant", "content": user_message}, "finish_reason": "stop", "index": 0}],
-            usage={"prompt_tokens": len(user_message.split()), "completion_tokens": len(user_message.split())},
+            model=response.model,
+            choices=[{"message": {"role": "assistant", "content": content, "original_content": content}, "finish_reason": choice.finish_reason, "index": choice.index}],
+            usage={"prompt_tokens": response.usage.prompt_tokens, "completion_tokens": response.usage.completion_tokens},
             metrics=metrics
         )
 
