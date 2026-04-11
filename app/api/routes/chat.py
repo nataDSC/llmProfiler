@@ -133,8 +133,18 @@ async def chat_completions(
         llm_router = LLMRouter(config, http_client)
         llm_response = await llm_router.route(request)
         p.end()
+        # Save the original LLM response content for UI display
+        llm_response_dict = llm_response.model_dump()
+        # Save the original content
+        if "choices" in llm_response_dict and llm_response_dict["choices"]:
+            original_content = llm_response_dict["choices"][0]["message"].get("content", "")
+        else:
+            original_content = ""
         # Redact PII in the outgoing LLM response
-        redacted_llm_response = redact_all_strings(llm_response.model_dump())
+        redacted_llm_response = redact_all_strings(llm_response_dict)
+        # Insert the original content for UI display
+        if "choices" in redacted_llm_response and redacted_llm_response["choices"]:
+            redacted_llm_response["choices"][0]["message"]["original_content"] = original_content
         llm_response = ChatResponse(**redacted_llm_response)
         llm_response.trace = " | ".join(trace_steps)
 

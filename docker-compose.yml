@@ -20,6 +20,8 @@ services:
     env_file: .env
     environment:
       - REDIS_URL=redis://cache:6379
+      # Uncomment the next line to run in echo (test) mode
+      # - ECHO_MODE=true
     depends_on:
       cache:
         condition: service_healthy

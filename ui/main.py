@@ -7,11 +7,20 @@ st.set_page_config(page_title="LLM Gateway & Profiler Demo", layout="wide")
 
 # --- Sidebar: Policy Engine & Debug Tools ---
 st.sidebar.title("Policy Engine & Debug Tools")
-policy = st.sidebar.selectbox(
+
+# Map user-friendly policies to real provider/model pairs
+POLICY_MODEL_MAP = {
+    "Penny Pincher (gpt-3.5-turbo)": ("openai", "gpt-3.5-turbo"),
+    "High Fidelity (gpt-4)": ("openai", "gpt-4"),
+    "Anthropic Claude 2.1": ("anthropic", "claude-2.1"),
+    "Chaos Mode (gpt-3.5-turbo)": ("openai", "gpt-3.5-turbo"),
+}
+policy_label = st.sidebar.selectbox(
     "Routing Policy",
-    ["Penny Pincher", "Speed Demon", "High Fidelity", "Chaos Mode"],
+    list(POLICY_MODEL_MAP.keys()),
     help="Choose how the gateway routes your request."
 )
+selected_provider, selected_model = POLICY_MODEL_MAP[policy_label]
 chaos_target = st.sidebar.selectbox(
     "Simulate Failure",
     ["None", "OpenAI", "Anthropic"],
@@ -60,17 +69,19 @@ elif theme == "Dark":
     st.text_area("Redacted message", value=redacted_output, key="redacted_output", disabled=True)
 
 # --- Backend URL config ---
+
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://gateway:8000/v1/chat/completions")
 
 # --- Helper: Send chat request to backend ---
-def send_chat_request(user_input, policy, chaos_target):
+def send_chat_request(user_input, chaos_target):
     headers = {}
     if chaos_target and chaos_target.lower() != "none":
         headers["X-Simulate-Error"] = chaos_target.lower()
-    # Example payload, adjust as needed for your backend
+    # Use selected_provider and selected_model from sidebar
     payload = {
-        "model": policy,  # This could be mapped to a real model/policy
+        "model": selected_model,
         "messages": [{"role": "user", "content": user_input}],
+        "provider_hint": selected_provider,
     }
     try:
         resp = requests.post(GATEWAY_URL, json=payload, headers=headers, timeout=15)
@@ -105,7 +116,7 @@ trace_placeholder.info("[Trace will appear here after sending a request]")
 # --- Send Button ---
 if st.button("Send"):
     with st.spinner("Contacting Gateway..."):
-        result = send_chat_request(user_input, policy, chaos_target)
+        result = send_chat_request(user_input, chaos_target)
         st.info(f"[DEBUG] Raw backend result: {result}")
         if result.get("rate_limited"):
             st.warning("429: Too many requests. Slow down.")
