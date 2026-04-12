@@ -198,9 +198,13 @@ if st.button("Send"):
             st.session_state["_latest_result"] = result
             trace_placeholder.info(st.session_state["_trace_output"])
             metrics = result.get("metrics", {})
-            metrics_col1.metric("Total Savings ($)", metrics.get("savings", "$0.00"))
-            metrics_col2.metric("Latency Delta", metrics.get("latency_delta", "0 ms"))
-            metrics_col3.metric("Cache Efficiency", metrics.get("cache_efficiency", "0%"))
+            # Display actual backend metrics
+            cost = metrics.get("estimated_cost_usd", 0.0)
+            latency = metrics.get("total_latency_ms", 0.0)
+            tps = metrics.get("tokens_per_second", 0.0)
+            metrics_col1.metric("Total Cost ($)", f"${cost:,.4f}")
+            metrics_col2.metric("Latency (ms)", f"{latency:.0f} ms")
+            metrics_col3.metric("Tokens/sec", f"{tps:.2f}")
             # Optionally clear session state after each query to avoid stale data
             # for key in ["_last_content", "_trace_output", "_redacted_prompt", "_latest_result"]:
             #     st.session_state.pop(key, None)
