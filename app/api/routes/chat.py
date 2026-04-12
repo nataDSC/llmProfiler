@@ -1,3 +1,4 @@
+from fastapi.responses import JSONResponse
 from app.middleware.pii import redact_all_strings
 
 import os
@@ -10,7 +11,18 @@ from app.services.pricing import calculate_request_cost
 from app.services.router import LLMRouter
 from app.core.http import get_http_client # Shared connection pool
 
+
+
 router = APIRouter()  # Remove prefix here
+
+# Admin endpoint to invalidate cache (must be after router is defined)
+@router.post("/admin/invalidate_cache")
+async def invalidate_cache():
+    from app.services.cache import HybridCache
+    import os
+    cache = HybridCache(redis_url=os.getenv("REDIS_URL", "redis://localhost:6379"))
+    await cache.invalidate_all()
+    return JSONResponse({"status": "ok", "detail": "Cache invalidated"})
 
 
 @router.post("/completions", response_model=ChatResponse)

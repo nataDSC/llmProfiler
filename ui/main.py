@@ -29,8 +29,16 @@ chaos_target = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.header("Admin Panel")
 if st.sidebar.button("Invalidate Cache"):
-    st.session_state["invalidate_cache"] = True
-    st.sidebar.success("Cache invalidation requested.")
+    # Call the backend endpoint to invalidate cache (correct path with prefix)
+    ADMIN_URL = os.getenv("GATEWAY_ADMIN_URL", "http://gateway:8000/v1/chat/admin/invalidate_cache")
+    try:
+        resp = requests.post(ADMIN_URL, timeout=10)
+        if resp.status_code == 200:
+            st.sidebar.success("Cache invalidated!")
+        else:
+            st.sidebar.error(f"Failed to invalidate cache: {resp.text}")
+    except Exception as e:
+        st.sidebar.error(f"Error: {e}")
 
 # --- Theme Switcher Gadget ---
 theme = st.sidebar.radio(
@@ -95,14 +103,24 @@ def send_chat_request(user_input, chaos_target):
 # --- Main Layout ---
 st.title("LLM Gateway & Profiler Demo")
 
+
+# --- Main Input/Results Layout ---
 col1, col2 = st.columns(2)
 
-# --- Metrics Dashboard Columns (define early so always available) ---
-metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
+# --- Clear Button ---
+
+def clear_all():
+    for key in ["user_input", "_last_content", "_trace_output", "_redacted_prompt", "_latest_result"]:
+        if key in st.session_state:
+            st.session_state.pop(key)
 
 with col1:
     st.subheader("User Sent")
     user_input = st.text_area("Your message", key="user_input")
+    if st.button("Clear", key="clear_button"):
+        clear_all()
+        st.rerun()
+    
     # Show redacted prompt after sending
     if st.session_state.get("_redacted_prompt"):
         st.markdown(
@@ -114,6 +132,10 @@ with col1:
             """,
             unsafe_allow_html=True
         )
+
+# --- Metrics Dashboard Columns (define early so always available) ---
+metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
+
 # with col2:
 #     st.subheader("Gateway Received (PII Redacted)")
 #     # Show redacted prompt after sending, always visible with results

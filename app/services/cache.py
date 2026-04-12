@@ -5,6 +5,21 @@ from redisvl.query import VectorQuery
 from app.core.config import settings
 
 class HybridCache:
+
+    async def invalidate_all(self):
+        """Clear all exact and semantic cache entries."""
+        # Delete all keys with prefix 'exact:' (exact match cache)
+        for key in self.client.scan_iter("exact:*"):
+            self.client.delete(key)
+        # Delete all keys with prefix 'cache:' (semantic cache)
+        for key in self.client.scan_iter("cache:*"):
+            self.client.delete(key)
+        # Optionally clear the vector index
+        try:
+            self.index.drop()
+            self.index.create(overwrite=True)
+        except Exception:
+            pass
     def __init__(self, redis_url: str):
         self.index_name = "llm_cache"
         # 1. Exact Match uses standard Redis Key-Value

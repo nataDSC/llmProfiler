@@ -9,6 +9,12 @@ from app.services.profiler import Profiler
 from app.services.pricing import calculate_request_cost
 
 class OpenAIAdapter(BaseLLMAdapter):
+
+    async def call(self, request):
+        import openai
+        # Use the OpenAI async client (if available)
+        client = openai.AsyncOpenAI(api_key=self.api_key)
+        return await self.complete(request, client)
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self.api_key = config["api_key"]
