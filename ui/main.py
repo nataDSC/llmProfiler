@@ -110,17 +110,18 @@ col1, col2 = st.columns(2)
 # --- Clear Button ---
 
 def clear_all():
-    for key in ["user_input", "_last_content", "_trace_output", "_redacted_prompt", "_latest_result"]:
+    # Explicitly clear user_input so text_area is reset
+    st.session_state["user_input"] = ""
+    for key in ["_last_content", "_trace_output", "_redacted_prompt", "_latest_result"]:
         if key in st.session_state:
             st.session_state.pop(key)
 
 with col1:
     st.subheader("User Sent")
-    user_input = st.text_area("Your message", key="user_input")
     if st.button("Clear", key="clear_button"):
         clear_all()
         st.rerun()
-    
+    user_input = st.text_area("Your message", key="user_input")
     # Show redacted prompt after sending
     if st.session_state.get("_redacted_prompt"):
         st.markdown(
