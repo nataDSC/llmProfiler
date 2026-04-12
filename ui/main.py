@@ -29,8 +29,31 @@ chaos_target = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.header("Admin Panel")
 
+
 # --- Disable Cache Toggle ---
 disable_cache = st.sidebar.toggle("Disable Cache (bypass)", value=False, help="Bypass cache for all requests (for rate limit/manual testing)")
+
+# --- Semantic Threshold Slider ---
+st.sidebar.markdown("---")
+st.sidebar.header("Semantic Cache Threshold")
+if "semantic_threshold" not in st.session_state:
+    st.session_state["semantic_threshold"] = 0.12
+
+def reset_threshold():
+    st.session_state["semantic_threshold"] = 0.12
+
+semantic_threshold = st.sidebar.slider(
+    "Semantic Match Threshold",
+    min_value=0.01,
+    max_value=1.0,
+    value=st.session_state["semantic_threshold"],
+    step=0.01,
+    help="Distance below which semantic cache is considered a hit. Lower = stricter."
+)
+st.session_state["semantic_threshold"] = semantic_threshold
+if st.sidebar.button("Reset to default (0.12)"):
+    reset_threshold()
+    st.experimental_rerun()
 
 if st.sidebar.button("Invalidate Cache"):
     # Call the backend endpoint to invalidate cache (correct path with prefix)
@@ -91,6 +114,8 @@ def send_chat_request(user_input, chaos_target):
         headers["X-Simulate-Error"] = chaos_target.lower()
     if disable_cache:
         headers["X-Disable-Cache"] = "true"
+    # Always send semantic threshold
+    headers["X-Semantic-Threshold"] = str(st.session_state.get("semantic_threshold", 0.12))
     # Use selected_provider and selected_model from sidebar
     payload = {
         "model": selected_model,

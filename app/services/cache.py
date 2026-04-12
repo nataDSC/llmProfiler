@@ -41,7 +41,7 @@ class HybridCache:
     def _get_hash(self, prompt: str) -> str:
         return hashlib.sha256(prompt.encode()).hexdigest()
 
-    async def check(self, prompt: str, vector: list[float] = None, trigger_refresh=None):
+    async def check(self, prompt: str, vector: list[float] = None, trigger_refresh=None, threshold: float = None):
         import logging
         logger = logging.getLogger("semantic_cache")
         import time
@@ -74,7 +74,8 @@ class HybridCache:
                 num_results=1
             )
             results = self.index.query(query)
-            # Lowered threshold: 0.12 distance = 88% similarity (was 0.05)
+            # Use threshold from argument if provided, else default to 0.12
+            use_threshold = threshold if threshold is not None else 0.12
             if results:
                 import logging
                 logger = logging.getLogger("semantic_cache")
@@ -102,7 +103,7 @@ class HybridCache:
                 data["semantic_cache_distance"] = distance
                 cached_at = data.get("cached_at", 0)
                 age = time.time() - cached_at
-                if distance < 0.3:
+                if distance < use_threshold:
                     if age < settings.cache_fresh_window:
                         return data, "semantic"
                     elif age < settings.cache_stale_window:

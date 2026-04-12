@@ -33,6 +33,7 @@ async def chat_completions(
     http_client = Depends(get_http_client)
 ):
 
+
     # 1. Initialize your Stateful Profiler (The Stopwatch)
     from app.models.chat import GatewayMetrics, ChatResponse
     p = Profiler()
@@ -52,6 +53,13 @@ async def chat_completions(
         if simulate_error:
             request.simulate_error = simulate_error.lower()
 
+        # 2.1. Check for cache disable and semantic threshold
+        disable_cache = http_req.headers.get("X-Disable-Cache", "false").lower() == "true"
+        semantic_threshold = http_req.headers.get("X-Semantic-Threshold")
+        try:
+            semantic_threshold = float(semantic_threshold) if semantic_threshold is not None else None
+        except Exception:
+            semantic_threshold = None
 
         # 3. Hybrid Cache Orchestration (fail open if Redis is unavailable)
         cache = None
@@ -74,7 +82,7 @@ async def chat_completions(
             except Exception as e:
                 logger.error(f"Background cache refresh failed: {e}")
 
-        if cache:
+        if cache and not disable_cache:
             try:
                 trace_steps.append("Checked cache for exact match")
                 cached_hit, cache_type = await cache.check(prompt, trigger_refresh=lambda p, d: asyncio.create_task(refresh_cache(p, d)))
@@ -111,24 +119,24 @@ async def chat_completions(
             vector = None
 
         # 3.3. Check Semantic Match (with stale-while-revalidate)
-        if cache:
+        if cache and not disable_cache:
             try:
                 if vector:
                     logger.info("[CACHE] Checking semantic cache for prompt (vector present)")
                     trace_steps.append("Checking semantic cache for prompt (vector present)")
-                    cached_hit, cache_type = await cache.check(prompt, vector=vector, trigger_refresh=lambda p, d: asyncio.create_task(refresh_cache(p, d)))
+                    cached_hit, cache_type = await cache.check(prompt, vector=vector, trigger_refresh=lambda p, d: asyncio.create_task(refresh_cache(p, d)), threshold=semantic_threshold)
                     # Always show the distance and threshold in the trace
                     distance = cached_hit.get("semantic_cache_distance") if cached_hit else None
-                    threshold = 0.12
+                    threshold_used = semantic_threshold if semantic_threshold is not None else 0.12
                     if distance is not None:
-                        trace_steps.append(f"Semantic cache distance: {distance:.4f} (threshold: {threshold})")
-                        if distance < threshold:
+                        trace_steps.append(f"Semantic cache distance: {distance:.4f} (threshold: {threshold_used})")
+                        if distance < threshold_used:
                             trace_steps.append("Semantic cache HIT (distance < threshold)")
                         else:
                             trace_steps.append("Semantic cache MISS (distance >= threshold)")
                     else:
                         trace_steps.append("Semantic cache distance unavailable (no result or error)")
-                    if cached_hit:
+                    if cached_hit and distance is not None and distance < threshold_used:
                         trace_steps.append("Checked cache for semantic match")
                         from app.models.chat import GatewayMetrics, ChatResponse
                         p.end()
@@ -186,12 +194,13 @@ async def chat_completions(
 
 
         # 5. Store result in Cache (synchronously, not background)
-        try:
-            logger.info("[CACHE] Storing result in cache")
-            trace_steps.append("Storing result in cache")
-            await cache.store(prompt, llm_response.model_dump(), vector)
-        except Exception as e:
-            logger.error(f"Cache store failed open: {e}")
+        if cache and not disable_cache:
+            try:
+                logger.info("[CACHE] Storing result in cache")
+                trace_steps.append("Storing result in cache")
+                await cache.store(prompt, llm_response.model_dump(), vector)
+            except Exception as e:
+                logger.error(f"Cache store failed open: {e}")
 
         # 6. Calculate the "Receipt" (Cost & Metrics)
         provider_used = llm_response.metrics.provider_used
