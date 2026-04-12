@@ -96,6 +96,10 @@ async def chat_completions(
                         output_tokens=0,
                         cost=0.0
                     )
+                    # Calculate cache stats for UI
+                    metrics.savings = cached_hit["response"].get("metrics", {}).get("estimated_cost_usd", 0.0)
+                    metrics.latency_delta = cached_hit["response"].get("metrics", {}).get("total_latency_ms", 0.0)
+                    metrics.cache_efficiency = 100
                     resp_data = dict(cached_hit["response"])
                     resp_data.pop("metrics", None)
                     # Redact PII in the outgoing response
@@ -147,6 +151,10 @@ async def chat_completions(
                             output_tokens=0,
                             cost=0.0
                         )
+                        # Calculate cache stats for UI
+                        metrics.savings = cached_hit["response"].get("metrics", {}).get("estimated_cost_usd", 0.0)
+                        metrics.latency_delta = cached_hit["response"].get("metrics", {}).get("total_latency_ms", 0.0)
+                        metrics.cache_efficiency = 100
                         resp_data = dict(cached_hit["response"])
                         resp_data.pop("metrics", None)
                         # Redact PII in the outgoing response
@@ -220,6 +228,10 @@ async def chat_completions(
             output_tokens=output_tokens,
             cost=cost
         )
+        # For LLM calls, set cache stats to 0
+        final_metrics.savings = 0.0
+        final_metrics.latency_delta = 0.0
+        final_metrics.cache_efficiency = 0
         llm_response.metrics = final_metrics
         response.headers["X-Gateway-Metrics"] = final_metrics.model_dump_json()
         logger.info(f"Route: Injected telemetry into headers: {final_metrics.model_dump_json()}")

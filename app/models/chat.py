@@ -4,6 +4,10 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
 class GatewayMetrics(BaseModel):
+    # UI stats
+    savings: float = 0.0
+    latency_delta: float = 0.0
+    cache_efficiency: int = 0
     """Real-time performance metrics for the LLM call."""
     ttft_ms: Optional[float] = Field(None, description="Time to First Token in milliseconds")
     total_latency_ms: float = Field(..., description="End-to-end request duration")

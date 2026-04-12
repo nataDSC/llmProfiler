@@ -37,10 +37,10 @@ disable_cache = st.sidebar.toggle("Disable Cache (bypass)", value=False, help="B
 st.sidebar.markdown("---")
 st.sidebar.header("Semantic Cache Threshold")
 if "semantic_threshold" not in st.session_state:
-    st.session_state["semantic_threshold"] = 0.12
+    st.session_state["semantic_threshold"] = 0.3
 
 def reset_threshold():
-    st.session_state["semantic_threshold"] = 0.12
+    st.session_state["semantic_threshold"] = 0.3
 
 semantic_threshold = st.sidebar.slider(
     "Semantic Match Threshold",
@@ -51,7 +51,7 @@ semantic_threshold = st.sidebar.slider(
     help="Distance below which semantic cache is considered a hit. Lower = stricter."
 )
 st.session_state["semantic_threshold"] = semantic_threshold
-if st.sidebar.button("Reset to default (0.12)"):
+if st.sidebar.button("Reset to default (0.3)"):
     reset_threshold()
     st.experimental_rerun()
 
@@ -165,8 +165,7 @@ with col1:
             unsafe_allow_html=True
         )
 
-# --- Metrics Dashboard Columns (define early so always available) ---
-metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
+
 
 # with col2:
 #     st.subheader("Gateway Received (PII Redacted)")
@@ -193,31 +192,47 @@ st.header("Execution Trace")
 trace_placeholder = st.empty()
 trace_placeholder.info("[Trace will appear here after sending a request]")
 
-# --- Send Button ---
+
+# --- Metrics Dashboard ---
+def show_metrics(metrics):
+    row1 = st.columns(3)
+    row2 = st.columns(3)
+    cost = metrics.get("estimated_cost_usd", 0.0)
+    latency = metrics.get("total_latency_ms", 0.0)
+    tps = metrics.get("tokens_per_second", 0.0)
+    savings = metrics.get("savings", 0.0)
+    latency_delta = metrics.get("latency_delta", 0.0)
+    cache_eff = metrics.get("cache_efficiency", 0.0)
+    row1[0].metric("Total Cost ($)", f"${cost:,.4f}")
+    row1[1].metric("Latency (ms)", f"{latency:.0f} ms")
+    row1[2].metric("Tokens/sec", f"{tps:.2f}")
+    row2[0].metric("Total Savings ($)", f"${savings:,.2f}")
+    row2[1].metric("Latency Delta", f"{latency_delta} ms")
+    row2[2].metric("Cache Efficiency", f"{cache_eff}%")
+
+
+
+# --- Metrics Dashboard ---
+def render_metrics():
+    st.markdown("---")
+    st.header("Metrics Dashboard")
+    if st.session_state.get("_latest_result"):
+        metrics = st.session_state["_latest_result"].get("metrics", {})
+        show_metrics(metrics)
+    else:
+        st.caption("Metrics will appear here after you run a query.")
+
+
+
 if st.button("Send"):
     with st.spinner("Contacting Gateway..."):
         result = send_chat_request(user_input, chaos_target)
-        # st.info(f"[DEBUG] Raw backend result: {result}")
-        # st.info(f"[DEBUG] UI sees redacted_prompt: {result.get('redacted_prompt', None)}")
-
-        # Show the redacted prompt immediately after sending
-        # if result.get('redacted_prompt'):
-        #     st.markdown(
-        #         f"""
-        #         <div style='background: #fff3cd; border-radius: 8px; padding: 1.2em; margin-bottom: 1em; border: 2px solid #bfa500;'>
-        #             <span style='font-size: 1.1em; font-weight: bold; color: #bfa500;'>Redacted Prompt (PII removed):</span><br><br>
-        #             <span style='font-size: 1.05em; color: #222;'>{result['redacted_prompt']}</span>
-        #         </div>
-        #         """,
-        #         unsafe_allow_html=True
-        #     )
         if result.get("rate_limited"):
             st.warning("429: Too many requests. Slow down.")
         elif result.get("error"):
             st.error(f"Error: {result['error']}")
         else:
             # Update UI with backend response
-            # Handle both direct and cached response structures
             content = None
             if "choices" in result and result["choices"]:
                 content = result["choices"][0].get("message", {}).get("content")
@@ -228,17 +243,6 @@ if st.button("Send"):
             st.session_state["_redacted_prompt"] = result.get("redacted_prompt", "")
             st.session_state["_latest_result"] = result
             trace_placeholder.info(st.session_state["_trace_output"])
-            metrics = result.get("metrics", {})
-            # Display actual backend metrics
-            cost = metrics.get("estimated_cost_usd", 0.0)
-            latency = metrics.get("total_latency_ms", 0.0)
-            tps = metrics.get("tokens_per_second", 0.0)
-            metrics_col1.metric("Total Cost ($)", f"${cost:,.4f}")
-            metrics_col2.metric("Latency (ms)", f"{latency:.0f} ms")
-            metrics_col3.metric("Tokens/sec", f"{tps:.2f}")
-            # Optionally clear session state after each query to avoid stale data
-            # for key in ["_last_content", "_trace_output", "_redacted_prompt", "_latest_result"]:
-            #     st.session_state.pop(key, None)
             if result.get("pii_blocked"):
                 st.info("PII Blocked: Sensitive data was detected and redacted.")
 
@@ -256,7 +260,6 @@ if st.button("Send"):
             # Show the actual LLM response (if available)
             actual_response = result.get("llm_response") or result["choices"][0]["message"].get("original_content") if "choices" in result and result["choices"] and "original_content" in result["choices"][0]["message"] else None
             if not actual_response:
-                # Fallback: If no explicit original_content, use the same as redacted (for echo/test adapters)
                 actual_response = result["choices"][0]["message"].get("content") if "choices" in result and result["choices"] else None
 
             if actual_response:
@@ -269,19 +272,15 @@ if st.button("Send"):
                     """,
                     unsafe_allow_html=True
                 )
+            # Render metrics immediately after updating session state
+            render_metrics()
+
+# Always render metrics at the bottom for initial/idle state
+if not st.session_state.get("_latest_result"):
+    render_metrics()
 
 # --- Metrics Dashboard ---
 st.markdown("---")
 st.header("Metrics Dashboard")
-with metrics_col1:
-    st.metric("Total Savings ($)", "$0.00")
-with metrics_col2:
-    st.metric("Latency Delta", "0 ms")
-with metrics_col3:
-    st.metric("Cache Efficiency", "0%")
-st.caption("Pie chart and real metrics will appear here once backend is connected.")
-
-# --- Rate Limiting & PII Badge ---
-if False:  # Placeholder for rate limit/PII feedback
-    st.warning("429: Too many requests. Slow down.")
-    st.info("PII Blocked: <EMAIL> detected and redacted.")
+if not st.session_state.get("_latest_result"):
+    st.caption("Metrics will appear here after you run a query.")
