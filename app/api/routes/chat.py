@@ -32,10 +32,13 @@ async def chat_completions(
         from app.services.embedding import EmbeddingService
         import asyncio
 
-        # 2. Extract Routing Hints
+        # 2. Extract Routing Hints and Chaos Mode
         provider_hint = http_req.headers.get("X-LLM-Provider")
         if provider_hint:
             request.provider_hint = provider_hint
+        simulate_error = http_req.headers.get("X-Simulate-Error")
+        if simulate_error:
+            request.simulate_error = simulate_error.lower()
 
 
         # 3. Hybrid Cache Orchestration (fail open if Redis is unavailable)
@@ -133,6 +136,10 @@ async def chat_completions(
         llm_router = LLMRouter(config, http_client)
         llm_response = await llm_router.route(request)
         p.end()
+        # Add the provider actually used to the trace
+        provider_used = getattr(llm_response.metrics, "provider_used", None)
+        if provider_used:
+            trace_steps.append(provider_used)
         # Save the original LLM response content for UI display
         llm_response_dict = llm_response.model_dump()
         # Save the original content

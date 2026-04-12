@@ -24,7 +24,7 @@ class LLMRouter:
             "openai": OpenAIAdapter,
             "anthropic": AnthropicAdapter,
         }
-        self.adapters: Dict[str, BaseLLMAdapter] = {}
+        self.adapters = {}
         self.openai_client = None
         self._setup_adapters()
 
@@ -41,6 +41,7 @@ class LLMRouter:
                 self.adapters[provider] = self._adapter_map[provider](provider_config)
 
     async def route(self, request: ChatRequest) -> ChatResponse:
+        import httpx  # Ensure httpx is always available in this scope
         print("[DEBUG] Entered LLMRouter.route() with request:", request)
         """
         Policy:
@@ -56,65 +57,36 @@ class LLMRouter:
             queue.extend([p for p in self.adapters.keys() if p != primary_provider])
 
         last_exception = None
+        provider_model_map = {
+            "openai": "gpt-3.5-turbo",
+            "anthropic": "claude-3-haiku-20240307",
+        }
 
         for provider_name in queue:
-            print(f"[DEBUG] Trying provider: {provider_name}")
-            logger.info(f"Router: Trying provider '{provider_name}' with config: {self.config['providers'].get(provider_name, {})}")
-            adapter = self.adapters.get(provider_name)
-            if not adapter:
-                logger.error(f"Router: No adapter found for provider '{provider_name}'")
+            # --- Model mapping for fallback ---
+            mapped_model = provider_model_map.get(provider_name)
+            original_model = request.model
+            if mapped_model and original_model != mapped_model:
+                logger.info(f"Router: Mapping model '{original_model}' to '{mapped_model}' for provider '{provider_name}' fallback.")
+                request.model = mapped_model
+            # --- Chaos Mode: Simulate Failure if requested ---
+            if getattr(request, "simulate_error", None) and request.simulate_error == provider_name:
+                logger.warning(f"[CHAOS MODE] Simulating failure for provider '{provider_name}' as requested.")
+                # Simulate a 502 Bad Gateway error, but continue to next provider (do not raise immediately)
+                last_exception = httpx.HTTPStatusError(f"Simulated failure for {provider_name}", request=None, response=type('obj', (object,), {'status_code': 502})())
+                logger.error(f"Exhausted {provider_name} due to Chaos Mode. Moving to fallback...")
                 continue
-
-            # Select the correct client for each provider
-            if provider_name == "openai":
-                client = self.openai_client
-            else:
-                client = self.http_client
-
-            # --- Retry Logic for OpenAI ---
-            # If it's OpenAI, we try up to 2 times (Initial + 1 Retry)
-            # For others, we try once and move to fallback.
-            max_attempts = 2 if provider_name == "openai" else 1
-
-            for attempt in range(max_attempts):
-                print(f"[DEBUG] Attempt {attempt + 1} for provider {provider_name}")
-                try:
-                    logger.info(f"Attempt {attempt + 1} for {provider_name}")
-                    logger.info(f"LLMRouter: Calling adapter.complete for provider '{provider_name}' with prompt: {request.messages[-1].content if request.messages else ''}")
-                    print(f"[DEBUG] Calling adapter.complete for provider '{provider_name}' with prompt: {request.messages[-1].content if request.messages else ''}")
-                    result = await adapter.complete(request, client)
-                    print(f"[DEBUG] Received response from provider '{provider_name}': {result}")
-                    logger.info(f"LLMRouter: Received response from provider '{provider_name}': {result}")
-                    logger.info(f"Router: Provider '{provider_name}' succeeded on attempt {attempt + 1}")
-                    return result
-
-                except httpx.HTTPStatusError as e:
-                    last_exception = e
-                    # 4xx errors are User Errors (Bad Request) - DON'T retry or fall back
-                    if e.response.status_code < 500:
-                        logger.error(f"User Error from {provider_name}: {e}")
-                        raise e
-
-                    # 5xx errors are Provider Errors - Log and check if we should retry
-                    logger.warning(f"{provider_name} Server Error ({e.response.status_code})...")
-
-                except (httpx.TimeoutException, httpx.NetworkError) as e:
-                    last_exception = e
-                    logger.warning(f"{provider_name} Connection Issue: {str(e)}...")
-
-                except Exception as e:
-                    last_exception = e
-                    logger.error(f"Router: Unexpected error from provider '{provider_name}': {e}")
-
-                # If we're here, the attempt failed.
-                # If we have retries left for THIS provider, wait a moment and try again.
-                if attempt < max_attempts - 1:
-                    wait_time = 0.5 # 500ms backoff
-                    await asyncio.sleep(wait_time)
-                else:
-                    # No more retries for this provider, move to next in queue
-                    logger.error(f"Exhausted {provider_name}. Moving to fallback...")
-            print(f"[DEBUG] Finished attempts for provider: {provider_name}")
-
+            # Actually call the provider adapter
+            try:
+                response = await self.adapters[provider_name].call(request)
+                return response
+            except (httpx.TimeoutException, httpx.NetworkError) as e:
+                last_exception = e
+                logger.warning(f"{provider_name} Connection Issue: {str(e)}...")
+            except Exception as e:
+                last_exception = e
+                logger.error(f"Router: Unexpected error from provider '{provider_name}': {e}")
+            # If we're here, the attempt failed. Move to next provider.
+        # If all providers fail
         print("[DEBUG] All providers exhausted. Raising error.")
         raise last_exception or RuntimeError("Gateway failed to find an available LLM provider.")

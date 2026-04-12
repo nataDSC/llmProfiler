@@ -8,6 +8,11 @@ import time
 import httpx
 
 class AnthropicAdapter(BaseLLMAdapter):
+
+    async def call(self, request):
+        import httpx
+        async with httpx.AsyncClient() as client:
+            return await self.complete(request, client)
     def __init__(self, config):
         super().__init__(config)
         self.api_key = config.get("api_key")
@@ -16,7 +21,7 @@ class AnthropicAdapter(BaseLLMAdapter):
         self.default_headers = {
             "x-api-key": self.api_key,
             "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
+            "content-type": "application/json"
         }
 
 
@@ -33,12 +38,16 @@ class AnthropicAdapter(BaseLLMAdapter):
         payload = {
             "model": settings.model_aliases.get(request.model, request.model),
             "messages": messages,
-            "max_tokens": request.max_tokens or 1024,
-            "temperature": request.temperature,
+            "max_tokens": request.max_tokens or 256,
         }
         if system_msg:
             payload["system"] = system_msg
 
+        # DEBUG: Print payload and headers for troubleshooting
+        logger.info(f"AnthropicAdapter: Payload to Anthropic: {payload}")
+        logger.info(f"AnthropicAdapter: Headers to Anthropic: {self.default_headers}")
+        print(f"[DEBUG] Anthropic payload: {payload}")
+        print(f"[DEBUG] Anthropic headers: {self.default_headers}")
         try:
             resp = await client.post(self.base_url, json=payload, headers=self.default_headers, timeout=60)
         except Exception as e:

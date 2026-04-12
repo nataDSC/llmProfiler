@@ -12,7 +12,7 @@ st.sidebar.title("Policy Engine & Debug Tools")
 POLICY_MODEL_MAP = {
     "Penny Pincher (gpt-3.5-turbo)": ("openai", "gpt-3.5-turbo"),
     "High Fidelity (gpt-4)": ("openai", "gpt-4"),
-    "Anthropic Claude 2.1": ("anthropic", "claude-2.1"),
+    "Anthropic Claude 2.1": ("anthropic", "claude-3-haiku-20240307"),
     "Chaos Mode (gpt-3.5-turbo)": ("openai", "gpt-3.5-turbo"),
 }
 policy_label = st.sidebar.selectbox(
@@ -104,7 +104,7 @@ with col1:
     st.subheader("User Sent")
     user_input = st.text_area("Your message", key="user_input")
     # Show redacted prompt after sending
-    if "_redacted_prompt" in st.session_state and st.session_state["redacted_prompt"]:
+    if st.session_state.get("_redacted_prompt"):
         st.markdown(
             f"""
             <div style='background: #fff3cd; border-radius: 8px; padding: 1.2em; margin-top: 1em; border: 2px solid #bfa500;'>
@@ -178,6 +178,9 @@ if st.button("Send"):
             metrics_col1.metric("Total Savings ($)", metrics.get("savings", "$0.00"))
             metrics_col2.metric("Latency Delta", metrics.get("latency_delta", "0 ms"))
             metrics_col3.metric("Cache Efficiency", metrics.get("cache_efficiency", "0%"))
+            # Optionally clear session state after each query to avoid stale data
+            # for key in ["_last_content", "_trace_output", "_redacted_prompt", "_latest_result"]:
+            #     st.session_state.pop(key, None)
             if result.get("pii_blocked"):
                 st.info("PII Blocked: Sensitive data was detected and redacted.")
 

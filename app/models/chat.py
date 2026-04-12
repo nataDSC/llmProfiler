@@ -26,6 +26,7 @@ class ChatRequest(BaseModel):
     temperature: float = 0.7
     max_tokens: Optional[int] = None
     provider_hint: Optional[str] = None  # Custom field for routing
+    simulate_error: Optional[str] = None  # For chaos/failover simulation
 
 class ChatResponse(BaseModel):
     """Enriched response including gateway telemetry."""

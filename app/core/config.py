@@ -28,8 +28,8 @@ class Settings:
         self.pricing_path = os.getenv("PRICING_PATH", "pricing.yaml")
         self.model_aliases = {
             # User-facing name : provider model name
-            "claude-3-sonnet": "claude-3-5-sonnet-20240620",
-            "claude-3-haiku": "claude-3-5-haiku-20240620",
+            "claude-3-haiku": "claude-3-haiku-20240307",
+            "Anthropic Claude 2.1": "claude-3-haiku-20240307",  # UI label to model
         }
         self.providers = {
             "openai": {"api_key": self.openai_api_key},
