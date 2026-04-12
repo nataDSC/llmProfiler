@@ -66,7 +66,7 @@ elif theme == "Dark":
         """,
         unsafe_allow_html=True,
     )
-    st.text_area("Redacted message", value=redacted_output, key="redacted_output", disabled=True)
+    st.text_area("Redacted LLM response", value=redacted_output, key="redacted_output", disabled=True)
 
 # --- Backend URL config ---
 
@@ -114,25 +114,25 @@ with col1:
             """,
             unsafe_allow_html=True
         )
-with col2:
-    st.subheader("Gateway Received (PII Redacted)")
-    # Show redacted prompt after sending, always visible with results
-    redacted_prompt_to_show = st.session_state.get("_redacted_prompt", "")
-    if "_latest_result" in st.session_state and st.session_state["_latest_result"]:
-        latest_result = st.session_state["_latest_result"]
-        if "redacted_prompt" in latest_result and latest_result["redacted_prompt"]:
-            redacted_prompt_to_show = latest_result["redacted_prompt"]
-    if redacted_prompt_to_show:
-        st.markdown(
-            f"""
-            <div style='background: #fff3cd; border-radius: 8px; padding: 1.2em; margin-bottom: 1em; border: 2px solid #bfa500;'>
-                <span style='font-size: 1.1em; font-weight: bold; color: #bfa500;'>Redacted Prompt (PII removed):</span><br><br>
-                <span style='font-size: 1.05em; color: #222;'>{redacted_prompt_to_show}</span>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    st.text_area("Trace", value=st.session_state.get("_trace_output", ""), key="trace_output", disabled=True)
+# with col2:
+#     st.subheader("Gateway Received (PII Redacted)")
+#     # Show redacted prompt after sending, always visible with results
+#     redacted_prompt_to_show = st.session_state.get("_redacted_prompt", "")
+#     if "_latest_result" in st.session_state and st.session_state["_latest_result"]:
+#         latest_result = st.session_state["_latest_result"]
+#         if "redacted_prompt" in latest_result and latest_result["redacted_prompt"]:
+#             redacted_prompt_to_show = latest_result["redacted_prompt"]
+#     if redacted_prompt_to_show:
+#         st.markdown(
+#             f"""
+#             <div style='background: #fff3cd; border-radius: 8px; padding: 1.2em; margin-bottom: 1em; border: 2px solid #bfa500;'>
+#                 <span style='font-size: 1.1em; font-weight: bold; color: #bfa500;'>Redacted Prompt (PII removed):</span><br><br>
+#                 <span style='font-size: 1.05em; color: #222;'>{redacted_prompt_to_show}</span>
+#             </div>
+#             """,
+#             unsafe_allow_html=True
+#         )
+#     st.text_area("Trace", value=st.session_state.get("_trace_output", ""), key="trace_output", disabled=True)
 # --- Execution Trace Panel (moved up) ---
 st.markdown("---")
 st.header("Execution Trace")
@@ -143,8 +143,8 @@ trace_placeholder.info("[Trace will appear here after sending a request]")
 if st.button("Send"):
     with st.spinner("Contacting Gateway..."):
         result = send_chat_request(user_input, chaos_target)
-        st.info(f"[DEBUG] Raw backend result: {result}")
-        st.info(f"[DEBUG] UI sees redacted_prompt: {result.get('redacted_prompt', None)}")
+        # st.info(f"[DEBUG] Raw backend result: {result}")
+        # st.info(f"[DEBUG] UI sees redacted_prompt: {result.get('redacted_prompt', None)}")
 
         # Show the redacted prompt immediately after sending
         if result.get('redacted_prompt'):

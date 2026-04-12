@@ -158,6 +158,11 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
 
 ## Phase 7: UI & Demo Experience
 
+**Status:** In Progress (April 2026)
+
+**TODO:**
+- [ ] Expand PII redaction coverage: Add regex patterns for phone numbers, addresses, and account numbers to the PII redaction logic. Consider using a PII detection library for more robust coverage.
+
 **Goal:** Deliver a production-grade, developer-focused UI and demo experience that showcases the gateway’s unique value: traceability, policy-driven routing, PII handling, and real-time metrics.
 
 **Highlights:**
