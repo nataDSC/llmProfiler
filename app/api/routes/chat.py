@@ -140,12 +140,15 @@ async def chat_completions(
             original_content = llm_response_dict["choices"][0]["message"].get("content", "")
         else:
             original_content = ""
-        # Redact PII in the outgoing LLM response
-        redacted_llm_response = redact_all_strings(llm_response_dict)
-        # Insert the original content for UI display
-        if "choices" in redacted_llm_response and redacted_llm_response["choices"]:
-            redacted_llm_response["choices"][0]["message"]["original_content"] = original_content
-        llm_response = ChatResponse(**redacted_llm_response)
+        # Redact ONLY the LLM output field
+        redacted_content = redact_all_strings(original_content)
+        # Insert both redacted and original content into the response
+        llm_response_dict["choices"][0]["message"]["original_content"] = original_content
+        llm_response_dict["choices"][0]["message"]["content"] = redacted_content
+        # Add redacted prompt for UI display
+        user_prompt = request.messages[-1].content if request.messages else ""
+        llm_response_dict["redacted_prompt"] = redact_all_strings(user_prompt)
+        llm_response = ChatResponse(**llm_response_dict)
         llm_response.trace = " | ".join(trace_steps)
 
         # 5. Store result in Cache (background task)

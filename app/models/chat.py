@@ -37,3 +37,4 @@ class ChatResponse(BaseModel):
     usage: Dict[str, int]
     metrics: GatewayMetrics  # The "Secret Sauce" of your project
     trace: Optional[str] = None  # Optional trace/debug info
+    redacted_prompt: Optional[str] = None  # Redacted user prompt for UI display

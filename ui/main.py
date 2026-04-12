@@ -103,9 +103,35 @@ metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
 with col1:
     st.subheader("User Sent")
     user_input = st.text_area("Your message", key="user_input")
+    # Show redacted prompt after sending
+    if "_redacted_prompt" in st.session_state and st.session_state["redacted_prompt"]:
+        st.markdown(
+            f"""
+            <div style='background: #fff3cd; border-radius: 8px; padding: 1.2em; margin-top: 1em; border: 2px solid #bfa500;'>
+                <span style='font-size: 1.1em; font-weight: bold; color: #bfa500;'>Redacted Prompt:</span><br><br>
+                <span style='font-size: 1.05em; color: #222;'>{st.session_state['_redacted_prompt']}</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 with col2:
     st.subheader("Gateway Received (PII Redacted)")
-    # The redacted message will be rendered after sending, see below.
+    # Show redacted prompt after sending, always visible with results
+    redacted_prompt_to_show = st.session_state.get("_redacted_prompt", "")
+    if "_latest_result" in st.session_state and st.session_state["_latest_result"]:
+        latest_result = st.session_state["_latest_result"]
+        if "redacted_prompt" in latest_result and latest_result["redacted_prompt"]:
+            redacted_prompt_to_show = latest_result["redacted_prompt"]
+    if redacted_prompt_to_show:
+        st.markdown(
+            f"""
+            <div style='background: #fff3cd; border-radius: 8px; padding: 1.2em; margin-bottom: 1em; border: 2px solid #bfa500;'>
+                <span style='font-size: 1.1em; font-weight: bold; color: #bfa500;'>Redacted Prompt (PII removed):</span><br><br>
+                <span style='font-size: 1.05em; color: #222;'>{redacted_prompt_to_show}</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     st.text_area("Trace", value=st.session_state.get("_trace_output", ""), key="trace_output", disabled=True)
 # --- Execution Trace Panel (moved up) ---
 st.markdown("---")
@@ -118,6 +144,19 @@ if st.button("Send"):
     with st.spinner("Contacting Gateway..."):
         result = send_chat_request(user_input, chaos_target)
         st.info(f"[DEBUG] Raw backend result: {result}")
+        st.info(f"[DEBUG] UI sees redacted_prompt: {result.get('redacted_prompt', None)}")
+
+        # Show the redacted prompt immediately after sending
+        if result.get('redacted_prompt'):
+            st.markdown(
+                f"""
+                <div style='background: #fff3cd; border-radius: 8px; padding: 1.2em; margin-bottom: 1em; border: 2px solid #bfa500;'>
+                    <span style='font-size: 1.1em; font-weight: bold; color: #bfa500;'>Redacted Prompt (PII removed):</span><br><br>
+                    <span style='font-size: 1.05em; color: #222;'>{result['redacted_prompt']}</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
         if result.get("rate_limited"):
             st.warning("429: Too many requests. Slow down.")
         elif result.get("error"):
@@ -132,6 +171,8 @@ if st.button("Send"):
                 content = result.get("redacted", "[No redacted output]")
             st.session_state["_last_content"] = content
             st.session_state["_trace_output"] = result.get("trace", "[No trace]")
+            st.session_state["_redacted_prompt"] = result.get("redacted_prompt", "")
+            st.session_state["_latest_result"] = result
             trace_placeholder.info(st.session_state["_trace_output"])
             metrics = result.get("metrics", {})
             metrics_col1.metric("Total Savings ($)", metrics.get("savings", "$0.00"))
