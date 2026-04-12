@@ -103,7 +103,8 @@ async def chat_completions(
 
         # 3.2. Get Embedding (only if no exact match)
         try:
-            trace_steps.append("Getting embedding for prompt")
+            trace_steps.append("Getting embedding for prompt (semantic cache path)")
+            logger.info("[CACHE] No exact cache hit, attempting semantic cache match (embedding generation)")
             vector = await embedding_service.get_vector(prompt)
         except Exception as e:
             logger.error(f"Embedding service failed open: {e}")
@@ -113,9 +114,22 @@ async def chat_completions(
         if cache:
             try:
                 if vector:
-                    trace_steps.append("Checked cache for semantic match")
+                    logger.info("[CACHE] Checking semantic cache for prompt (vector present)")
+                    trace_steps.append("Checking semantic cache for prompt (vector present)")
                     cached_hit, cache_type = await cache.check(prompt, vector=vector, trigger_refresh=lambda p, d: asyncio.create_task(refresh_cache(p, d)))
+                    # Always show the distance and threshold in the trace
+                    distance = cached_hit.get("semantic_cache_distance") if cached_hit else None
+                    threshold = 0.12
+                    if distance is not None:
+                        trace_steps.append(f"Semantic cache distance: {distance:.4f} (threshold: {threshold})")
+                        if distance < threshold:
+                            trace_steps.append("Semantic cache HIT (distance < threshold)")
+                        else:
+                            trace_steps.append("Semantic cache MISS (distance >= threshold)")
+                    else:
+                        trace_steps.append("Semantic cache distance unavailable (no result or error)")
                     if cached_hit:
+                        trace_steps.append("Checked cache for semantic match")
                         from app.models.chat import GatewayMetrics, ChatResponse
                         p.end()
                         metrics = p.get_metrics(
@@ -170,13 +184,14 @@ async def chat_completions(
         llm_response = ChatResponse(**llm_response_dict)
         llm_response.trace = " | ".join(trace_steps)
 
-        # 5. Store result in Cache (background task)
-        async def store_in_cache():
-            try:
-                await cache.store(prompt, llm_response.model_dump(), vector)
-            except Exception as e:
-                logger.error(f"Cache store failed open: {e}")
-        asyncio.create_task(store_in_cache())
+
+        # 5. Store result in Cache (synchronously, not background)
+        try:
+            logger.info("[CACHE] Storing result in cache")
+            trace_steps.append("Storing result in cache")
+            await cache.store(prompt, llm_response.model_dump(), vector)
+        except Exception as e:
+            logger.error(f"Cache store failed open: {e}")
 
         # 6. Calculate the "Receipt" (Cost & Metrics)
         provider_used = llm_response.metrics.provider_used

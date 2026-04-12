@@ -1,3 +1,6 @@
+import logging
+import os
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.core.http import close_http_client

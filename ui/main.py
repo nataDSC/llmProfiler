@@ -28,6 +28,10 @@ chaos_target = st.sidebar.selectbox(
 )
 st.sidebar.markdown("---")
 st.sidebar.header("Admin Panel")
+
+# --- Disable Cache Toggle ---
+disable_cache = st.sidebar.toggle("Disable Cache (bypass)", value=False, help="Bypass cache for all requests (for rate limit/manual testing)")
+
 if st.sidebar.button("Invalidate Cache"):
     # Call the backend endpoint to invalidate cache (correct path with prefix)
     ADMIN_URL = os.getenv("GATEWAY_ADMIN_URL", "http://gateway:8000/v1/chat/admin/invalidate_cache")
@@ -85,6 +89,8 @@ def send_chat_request(user_input, chaos_target):
     headers = {}
     if chaos_target and chaos_target.lower() != "none":
         headers["X-Simulate-Error"] = chaos_target.lower()
+    if disable_cache:
+        headers["X-Disable-Cache"] = "true"
     # Use selected_provider and selected_model from sidebar
     payload = {
         "model": selected_model,
@@ -170,16 +176,16 @@ if st.button("Send"):
         # st.info(f"[DEBUG] UI sees redacted_prompt: {result.get('redacted_prompt', None)}")
 
         # Show the redacted prompt immediately after sending
-        if result.get('redacted_prompt'):
-            st.markdown(
-                f"""
-                <div style='background: #fff3cd; border-radius: 8px; padding: 1.2em; margin-bottom: 1em; border: 2px solid #bfa500;'>
-                    <span style='font-size: 1.1em; font-weight: bold; color: #bfa500;'>Redacted Prompt (PII removed):</span><br><br>
-                    <span style='font-size: 1.05em; color: #222;'>{result['redacted_prompt']}</span>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+        # if result.get('redacted_prompt'):
+        #     st.markdown(
+        #         f"""
+        #         <div style='background: #fff3cd; border-radius: 8px; padding: 1.2em; margin-bottom: 1em; border: 2px solid #bfa500;'>
+        #             <span style='font-size: 1.1em; font-weight: bold; color: #bfa500;'>Redacted Prompt (PII removed):</span><br><br>
+        #             <span style='font-size: 1.05em; color: #222;'>{result['redacted_prompt']}</span>
+        #         </div>
+        #         """,
+        #         unsafe_allow_html=True
+        #     )
         if result.get("rate_limited"):
             st.warning("429: Too many requests. Slow down.")
         elif result.get("error"):
