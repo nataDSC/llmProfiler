@@ -3,10 +3,19 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
+
+# Enhanced PII regex patterns
 PII_PATTERNS = [
-    re.compile(r"[\w\.-]+@[\w\.-]+"),  # Email addresses
-    re.compile(r"\b\d{3}[-.]?\d{2}[-.]?\d{4}\b"),  # SSN (very basic)
-    re.compile(r"\b\d{16}\b"),  # Credit card (very basic)
+    # Email addresses
+    re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"),
+    # SSN (US Social Security Number)
+    re.compile(r"\b\d{3}[-.]?\d{2}[-.]?\d{4}\b"),
+    # Credit card numbers (Visa, MasterCard, Amex, Discover, generic 16-digit)
+    re.compile(r"(?:\b\d{4}[- ]?){3}\d{4}\b"),
+    # Phone numbers (US, various formats)
+    re.compile(r"\(?\b\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"),
+    # Addresses (simple US street address patterns)
+    re.compile(r"\b\d{1,6}\s+[A-Za-z0-9.,'\-\s]+(Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Suite|Apt|Apartment|Unit)\b[\w\s,.'-]*"),
 ]
 
 REDACTION = "[REDACTED]"

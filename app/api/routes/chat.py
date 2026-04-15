@@ -142,6 +142,14 @@ async def chat_completions(
                         trace_steps.append("Semantic cache distance unavailable (no result or error)")
                     if cached_hit and distance is not None and distance < threshold_used:
                         trace_steps.append("Checked cache for semantic match")
+                        # --- PATCH: Always store semantic hit in exact cache ---
+                        try:
+                            logger.info("[CACHE PATCH] Storing semantic cache hit in exact cache for prompt.")
+                            # Use the same prompt string and vector as used for semantic cache
+                            await cache.store(prompt, cached_hit["response"], vector)
+                            trace_steps.append("Stored semantic cache hit in exact cache.")
+                        except Exception as e:
+                            logger.error(f"[CACHE PATCH] Failed to store semantic hit in exact cache: {e}")
                         from app.models.chat import GatewayMetrics, ChatResponse
                         p.end()
                         metrics = p.get_metrics(

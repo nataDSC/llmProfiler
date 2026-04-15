@@ -50,20 +50,27 @@ class HybridCache:
         prompt_hash = self._get_hash(prompt)
         logger.info(f"[CACHE CHECK] prompt='{prompt}' hash={prompt_hash} vector_shape={len(vector) if vector is not None else None}")
         logger.info(f"[CACHE CHECK] Redis index exists: {hasattr(self, 'index') and hasattr(self.index, 'client') and self.index.client is not None}")
-        exact_hit = self.client.get(f"exact:{prompt_hash}")
+        exact_key = f"exact:{prompt_hash}"
+        exact_hit = self.client.get(exact_key)
+        logger.info(f"[CACHE CHECK] Exact cache lookup for key={exact_key} returned: {'HIT' if exact_hit else 'MISS'}, exact_hit={exact_hit}")
         if exact_hit:
             data = json.loads(exact_hit)
             cached_at = data.get("cached_at", 0)
             age = time.time() - cached_at
+            logger.info(f"[EXACT CACHE] HIT for key={exact_key} (age={age:.2f}s, fresh_window={settings.cache_fresh_window})")
             if age < settings.cache_fresh_window:
                 return data, "exact"
             elif age < settings.cache_stale_window:
-                # Stale-while-revalidate: return, but trigger refresh
+                logger.info(f"[EXACT CACHE] STALE for key={exact_key} (age={age:.2f}s, stale_window={settings.cache_stale_window})")
                 if trigger_refresh:
                     trigger_refresh(prompt, data)
                 return data, "exact_stale"
             else:
+                logger.info(f"[EXACT CACHE] EXPIRED for key={exact_key} (age={age:.2f}s)")
                 return None, None
+        else:
+            logger.info(f"[EXACT CACHE] MISS for key={exact_key}")
+        # --- Tier 2: Semantic Match ---
 
         # --- Tier 2: Semantic Match ---
         if vector:
@@ -99,15 +106,19 @@ class HybridCache:
                     return None, None
                 logger.info(f"Semantic cache distance for prompt '{prompt}': {distance}")
                 # Attach distance to data for trace/debug
-                data = json.loads(result0["response"])
-                data["semantic_cache_distance"] = distance
+                try:
+                    data = json.loads(result0["response"])
+                    data["semantic_cache_distance"] = distance
+                except Exception as e:
+                    logger.error(f"Could not parse semantic cache response JSON: {result0.get('response')}, error: {e}")
+                    return None, None
                 cached_at = data.get("cached_at", 0)
                 age = time.time() - cached_at
                 if distance < use_threshold:
                     if age < settings.cache_fresh_window:
                         return data, "semantic"
                     elif age < settings.cache_stale_window:
-                        if trigger_refresh:
+                        if trigger_refresh and data is not None:
                             trigger_refresh(prompt, data)
                         return data, "semantic_stale"
                 # If not within threshold or too old
@@ -135,7 +146,9 @@ class HybridCache:
         # Add cached_at metadata
         data = {"prompt": prompt, "response": response, "cached_at": time.time()}
         # Store Exact
-        self.client.set(f"exact:{prompt_hash}", json.dumps(data), ex=ttl)
+        exact_key = f"exact:{prompt_hash}"
+        logger.info(f"[EXACT CACHE STORE] Storing key={exact_key} with TTL={ttl}s for prompt='{prompt}'")
+        self.client.set(exact_key, json.dumps(data), ex=ttl)
         # Store Semantic (vector as bytes)
         if vector_list is not None:
             logger.info(f"[CACHE STORE] Storing semantic vector for hash={prompt_hash} shape={len(vector_list)}")

@@ -154,16 +154,16 @@ with col1:
         st.rerun()
     user_input = st.text_area("Your message", key="user_input")
     # Show redacted prompt after sending
-    if st.session_state.get("_redacted_prompt"):
-        st.markdown(
-            f"""
-            <div style='background: #fff3cd; border-radius: 8px; padding: 1.2em; margin-top: 1em; border: 2px solid #bfa500;'>
-                <span style='font-size: 1.1em; font-weight: bold; color: #bfa500;'>Redacted Prompt:</span><br><br>
-                <span style='font-size: 1.05em; color: #222;'>{st.session_state['_redacted_prompt']}</span>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    # if st.session_state.get("_redacted_prompt"):
+    #     st.markdown(
+    #         f"""
+    #         <div style='background: #fff3cd; border-radius: 8px; padding: 1.2em; margin-top: 1em; border: 2px solid #bfa500;'>
+    #             <span style='font-size: 1.1em; font-weight: bold; color: #bfa500;'>Redacted Prompt:</span><br><br>
+    #             <span style='font-size: 1.05em; color: #222;'>{st.session_state['_redacted_prompt']}</span>
+    #         </div>
+    #         """,
+    #         unsafe_allow_html=True
+    #     )
 
 
 
@@ -207,7 +207,7 @@ def show_metrics(metrics):
     row1[1].metric("Latency (ms)", f"{latency:.0f} ms")
     row1[2].metric("Tokens/sec", f"{tps:.2f}")
     row2[0].metric("Total Savings ($)", f"${savings:,.2f}")
-    row2[1].metric("Latency Delta", f"{latency_delta} ms")
+    row2[1].metric("Latency Delta (ms)", f"{latency_delta:.2f} ms")
     row2[2].metric("Cache Efficiency", f"{cache_eff}%")
 
 
@@ -246,6 +246,17 @@ if st.button("Send"):
             if result.get("pii_blocked"):
                 st.info("PII Blocked: Sensitive data was detected and redacted.")
 
+            # Show redacted prompt after sending
+            if st.session_state.get("_redacted_prompt"):
+                st.markdown(
+                    f"""
+                    <div style='background: #fff3cd; border-radius: 8px; padding: 1.2em; margin-top: 1em; border: 2px solid #bfa500;'>
+                        <span style='font-size: 1.1em; font-weight: bold; color: #bfa500;'>Redacted Prompt:</span><br><br>
+                        <span style='font-size: 1.05em; color: #222;'>{st.session_state['_redacted_prompt']}</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
             # Show the redacted message (styled)
             st.markdown(
                 f"""
@@ -278,9 +289,3 @@ if st.button("Send"):
 # Always render metrics at the bottom for initial/idle state
 if not st.session_state.get("_latest_result"):
     render_metrics()
-
-# --- Metrics Dashboard ---
-st.markdown("---")
-st.header("Metrics Dashboard")
-if not st.session_state.get("_latest_result"):
-    st.caption("Metrics will appear here after you run a query.")
