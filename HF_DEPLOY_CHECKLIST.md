@@ -16,17 +16,17 @@ This checklist will guide you through deploying your FastAPI LLM Gateway to Hugg
 
 ## 2. Prepare Your Repository
 
-- [ ] Ensure all secrets are loaded via environment variables (not hardcoded)
+- [*] Ensure all secrets are loaded via environment variables (not hardcoded)
 - [*] Push latest code to GitHub
-- [ ] Confirm Dockerfile uses `CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]`
+- [*] Confirm Dockerfile uses `CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]`
 
 ---
 
 ## 3. Create a Hugging Face Space
 
-- [ ] Go to https://huggingface.co/spaces
-- [ ] Click "Create new Space"
-- [ ] Choose "Docker" as the SDK
+- [*] Go to https://huggingface.co/spaces
+- [*] Click "Create new Space"
+- [*] Choose "Docker" as the SDK
 - [ ] Link your GitHub repo (or upload files directly)
 
 ---

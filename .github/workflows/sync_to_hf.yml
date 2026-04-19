@@ -1,9 +1,7 @@
 name: Sync to Hugging Face Spaces
 
 on:
-  push:
-    branches:
-      - main # change to your deploy branch if different
+  workflow_dispatch:
 
 jobs:
   sync-gateway:

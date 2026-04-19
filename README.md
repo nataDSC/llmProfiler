@@ -1,3 +1,13 @@
+---
+title: LLM Gateway
+emoji: 🚀
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
 # 🚀 LLM Gateway & Performance Profiler
 
 A high-performance, asynchronous **LLM Proxy** built with FastAPI. This gateway provides a single entry point for multiple LLM providers (OpenAI, Anthropic, Local) while offering enterprise-grade failover, hybrid (exact + semantic/vector) caching, PII sanitization, and real-time performance profiling.
