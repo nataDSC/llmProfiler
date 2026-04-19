@@ -1,0 +1,70 @@
+name: Sync to Hugging Face Spaces
+
+on:
+  push:
+    branches:
+      - main # change to your deploy branch if different
+
+jobs:
+  sync-gateway:
+    name: Sync Gateway Space
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history needed for force-push
+
+      - name: Push to HF Gateway Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ secrets.HF_GATEWAY_SPACE }} # e.g. maarseek/llm_gateway
+        run: |
+          git remote add hf-gateway "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}"
+          git push hf-gateway main:main --force
+
+  sync-ui:
+    name: Sync UI Space
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Stage UI files and push to HF UI Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_UI_SPACE: ${{ secrets.HF_UI_SPACE }} # e.g. alice/llm_gateway_ui
+          GATEWAY_URL: ${{ secrets.HF_GATEWAY_URL }} # e.g. https://alice-llm-gateway.hf.space
+        run: |
+          # Stage ui/ contents to a temp dir (HF expects Dockerfile at root)
+          TMPDIR=$(mktemp -d)
+          cp -r ui/. "$TMPDIR/"
+
+          # Write HF Space frontmatter
+          cat > "$TMPDIR/README.md" <<EOF
+          ---
+          title: LLM Gateway UI
+          emoji: 📊
+          colorFrom: green
+          colorTo: blue
+          sdk: docker
+          app_port: 8501
+          pinned: false
+          ---
+          EOF
+
+          # Inject GATEWAY_URL into Dockerfile
+          sed -i "s|ENV GATEWAY_URL=.*|ENV GATEWAY_URL=${GATEWAY_URL}/v1/chat/completions|" "$TMPDIR/Dockerfile" || \
+            echo "ENV GATEWAY_URL=${GATEWAY_URL}/v1/chat/completions" >> "$TMPDIR/Dockerfile"
+
+          # Commit and push
+          cd "$TMPDIR"
+          git init -b main
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions"
+          git add -A
+          git commit -m "deploy: sync from GitHub ${GITHUB_SHA::7}"
+          git remote add hf-ui "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_UI_SPACE}"
+          git push hf-ui main:main --force
