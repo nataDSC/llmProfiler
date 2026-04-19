@@ -158,10 +158,11 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
 
 ## Phase 7: UI & Demo Experience
 
-**Status:** In Progress (April 2026)
+**Status:** Complete (April 2026)
 
 **TODO:**
-- [ ] Expand PII redaction coverage: Add regex patterns for phone numbers, addresses, and account numbers to the PII redaction logic. Consider using a PII detection library for more robust coverage.
+
+- Expanded PII redaction coverage: Added regex patterns for phone numbers, addresses, and account numbers to the PII redaction logic. Consider using a PII detection library for more robust coverage in the future.
 
 **Goal:** Deliver a production-grade, developer-focused UI and demo experience that showcases the gateway’s unique value: traceability, policy-driven routing, PII handling, and real-time metrics.
 
@@ -184,7 +185,7 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
    - Use Streamlit for the UI, running on port 8501, talking to FastAPI (port 8000).
    - Prepare for AWS deployment: UI as a separate container/service.
 
-3. **UI Features & Senior Architecture**
+3. **UI Features & Enterprise Architecture**
    - **Execution Trace Panel:** Waterfall view of each step (PII, cache, embedding, router, etc.) with timing and status.
    - **Sidebar Policy Engine:** Routing policy selector (Penny Pincher, Speed Demon, High Fidelity, Chaos Mode for error simulation).
    - **Chaos Mode:** UI toggle sends `X-Simulate-Error` header to trigger simulated provider failures; FastAPI middleware and router logic handle and trace simulated errors for demo and testing.
@@ -216,7 +217,7 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
    - Add/expand tests for API endpoints supporting the UI (trace, metrics, cache control, chaos, rate limiting, PII redaction).
    - Document demo scenarios, UI usage, and local/cloud deployment in README.
 
-**Status:** Planned
+**Status:** Complete
 
 4. **Demo Workflow**
    - Demonstrate cache hit/miss, semantic similarity, and manual cache invalidation live.
@@ -229,4 +230,4 @@ This plan outlines the phased approach for building a robust, async, adapter-bas
    - Add/expand tests for API endpoints supporting the UI (trace, metrics, cache control).
    - Document demo scenarios and UI usage in README.
 
-**Status:** Planned
+**Status:** Complete
