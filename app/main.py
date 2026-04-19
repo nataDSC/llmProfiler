@@ -29,6 +29,10 @@ app.middleware("http")(metrics_middleware)
 # Register routers
 app.include_router(chat.router, prefix="/v1/chat")
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 @app.get("/metrics")
 def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
