@@ -11,6 +11,8 @@ pinned: false
 # 🚀 LLM Gateway & Performance Profiler
 
 A high-performance, asynchronous **LLM Proxy** built with FastAPI. This gateway provides a single entry point for multiple LLM providers (OpenAI, Anthropic, Local) while offering enterprise-grade failover, hybrid (exact + semantic/vector) caching, PII sanitization, and real-time performance profiling.
+<br><br>
+Link to the public deployment of the application on Hugging Face: [ LLM Gateway and Performance Profiler ](https://huggingface.co/spaces/maarseek/llm_gateway_ui)
 
 ## 🌟 Key Features
 
